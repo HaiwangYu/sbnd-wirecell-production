@@ -1,0 +1,7 @@
+# work dirs and products never go in here
+*.root
+*.tar.gz
+*.zip
+*.h5
+*.log
+__pycache__/

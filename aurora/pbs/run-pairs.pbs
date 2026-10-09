@@ -1,0 +1,19 @@
+#!/bin/bash
+#PBS -N sbnd-wc-flatcaf
+#PBS -A neutrinoGPU
+#PBS -q prod
+#PBS -l select=1
+#PBS -l walltime=06:00:00
+#PBS -l filesystems=flare:home
+#PBS -j oe
+# The three-step workflow (README.md) for the pairs in PAIRS on ONE Aurora compute node.
+#   qsub -v "REPO=<.../sbnd-wirecell-production/aurora>,PAIRS=<pairs.tsv>,WORK=<workdir>[,WC_MAXPAR=100][,SCHEMA=...]" pbs/run-pairs.pbs
+# Containers only work on compute nodes (login nodes have no user namespaces), so steps 1-3 all
+# run here.  find-pairs.py in path mode can run on a login node beforehand (no samweb on Aurora;
+# SAM mode works at FNAL, then --path-map the /pnfs locations to the Flare copies).
+set -u
+REPO=${REPO:?}; PAIRS=${PAIRS:?}; WORK=${WORK:?}
+cd "$REPO"
+echo "=== $(date) $(hostname) job ${PBS_JOBID:-} REPO=$REPO PAIRS=$PAIRS WORK=$WORK"
+bash bin/run-pairs.sh site/aurora.sh "$PAIRS" "$WORK" ${SCHEMA:+"$SCHEMA"}
+echo "=== $(date) done"; cat "$WORK/pool.log" | tail -5; cat "$WORK/cost-summary.md"
