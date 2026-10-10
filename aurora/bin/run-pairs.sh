@@ -6,12 +6,15 @@
 # pairs.tsv (bin/find-pairs.py): id <TAB> reality <TAB> reco1 path <TAB> caf path [<TAB> anything]
 # schema: default schema/recTreeWireCell.schema.json next to this repo's bin/.
 #
-# A pool: one pair = one bin/run-pair.sh (steps 1-3 + validation, sequential).  The concurrency
+# A pool: one pair = one bin/run_pair.py (precheck, steps 1-3, validation, with the exception
+# handling described there: timeouts, step-1 slicing around a failing event, step-2 retries,
+# partial merge, every failed try kept).  The concurrency
 # limit is re-read before every launch: WC_MAXPAR, or WC_DAY_MAXPAR between WC_DAY_START and
 # WC_DAY_END local time, or a number in <workdir>/maxpar.override (live; delete to go back).
 # No launch while our RSS > WC_MEM_GUARD_GB or the machine has < WC_SYS_MIN_AVAIL_GB available,
 # or (WC_KRB_WAIT=1, FNAL) while there is no Kerberos ticket.  Running pairs are never killed.
-# Pairs whose <id>/status is OK are skipped, so rerunning resumes.
+# Pairs whose <id>/status is OK or PARTIAL are skipped (WC_RETRY_PARTIAL=1 reruns PARTIAL ones);
+# a FAIL pair is rerun, reusing every finished step-1 slice and step-2 tar.
 set -u
 SITE=${1:?site config}; PAIRS=${2:?pairs.tsv}; WORK=${3:?workdir}
 BIN=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -38,7 +41,9 @@ sys_avail_gb() { awk '/MemAvailable/ {printf "%d", $2/1048576}' /proc/meminfo; }
 nrun=0; last=""
 while IFS=$'\t' read -r id real r1 caf _rest; do
   [ -z "$id" ] && continue; [[ $id == \#* ]] && continue
-  [ "$(cat "$WORK/$id/status" 2>/dev/null)" = OK ] && continue
+  st=$(cat "$WORK/$id/status" 2>/dev/null)
+  [ "$st" = OK ] && continue
+  [ "$st" = PARTIAL ] && [ "${WC_RETRY_PARTIAL:-0}" != 1 ] && continue
   lim=$(cur_maxpar); [ "$lim" != "$last" ] && { echo "$(/bin/date '+%F %T') concurrency limit $lim" >> "$LOG"; last=$lim; }
   while [ $nrun -ge "$lim" ]; do wait -n; nrun=$((nrun-1)); lim=$(cur_maxpar); done
   while [ "$(ourmem_gb)" -ge "$WC_MEM_GUARD_GB" ] || [ "$(sys_avail_gb)" -lt "$WC_SYS_MIN_AVAIL_GB" ]; do /usr/bin/sleep 30; done
@@ -46,12 +51,13 @@ while IFS=$'\t' read -r id real r1 caf _rest; do
     echo "$(/bin/date '+%F %T') no valid Kerberos ticket -- waiting (kinit to resume)" >> "$LOG"
     until /usr/bin/klist -s 2>/dev/null; do /usr/bin/sleep 60; done
   fi
-  ( "$BIN/run-pair.sh" "$id" "$real" "$r1" "$caf" "$WORK" "$SCHEMA" > /dev/null 2>&1
-    echo "$(/bin/date '+%F %T') $id $(cat "$WORK/$id/status" 2>/dev/null || echo 'NO STATUS (run-pair.sh did not run?)')" >> "$LOG" ) &
+  rm -f "$WORK/$id/status"
+  ( python3 "$BIN/run_pair.py" "$id" "$real" "$r1" "$caf" "$WORK" "$SCHEMA" > "$WORK/$id.run_pair.out" 2>&1
+    echo "$(/bin/date '+%F %T') $id $(cat "$WORK/$id/status" 2>/dev/null || echo 'NO STATUS (run_pair.py did not run?)')" >> "$LOG" ) &
   nrun=$((nrun+1))
   /usr/bin/sleep 2
 done < "$PAIRS"
 wait
-echo "$(/bin/date '+%F %T') pool done: $(cat "$WORK"/*/status 2>/dev/null | grep -cx OK) pairs OK" >> "$LOG"
+echo "$(/bin/date '+%F %T') pool done: $(cat "$WORK"/*/status 2>/dev/null | grep -cx OK) OK, $(cat "$WORK"/*/status 2>/dev/null | grep -cx PARTIAL) PARTIAL, $(cat "$WORK"/*/status 2>/dev/null | grep -c '^FAIL') FAIL" >> "$LOG"
 python3 "$BIN/cost-summary.py" "$WORK" > "$WORK/cost-summary.md" 2>&1
 echo "end     $(/bin/date '+%F %T %Z')" >> "$WORK/RUN-RECORD.txt"

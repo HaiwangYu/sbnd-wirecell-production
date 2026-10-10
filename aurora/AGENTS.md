@@ -31,8 +31,8 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 - **Data needs FrameShift.** Gen2 data reco1 must go through `run_frameshift.fcl` first. Without the product, step 1 silently uses a shift of 0, and the light matching is wrong. `step1.sh` warns when every event has `frame_apply_at_caf 0 ns` on data. MC has no product by design.
 - **The intermittent PR crash.** Step 2 segfaults now and then (`TrackFitting::update_association`, `SteinerGrapher`; peak RSS ~4.5 GB), much more often on nueCC (~1 per 550 events) than on BNB CV (~1 per 13,000).
   - A crash also leaves the previous event's `tracking-pr.root` as a stub.
-  - `run-pair.sh` reruns the whole tar once into a fresh `pr/` and keeps `pr-try1/`. A unit that fails twice needs a third, manual try.
-- **A deterministic step-1 crash:** MC CV run 471 / subrun 18 / event 33 (`clustering_connect1` recursion). Its file fails step 1 every time. Run the other events with `step1.sh <file> <dir> sim <nskip> <n>` around it.
+  - `run_pair.py` retries a failed tar once (`WC_STEP2_ATTEMPTS`) and keeps every failed try under `attempts/`. If all tries fail, it still merges the complete events of all tries, giving `PARTIAL`.
+- **A deterministic step-1 crash:** MC CV run 471 / subrun 18 / event 33 (`clustering_connect1` recursion). `run_pair.py` finds the failing event from the log and reruns the file in slices around it, giving `PARTIAL` with the event listed in `events.json`.
 - **`--nskip` counts in art's FileIndex order** (sorted by run / subrun / event), not tree order.
 - **Kerberos (FNAL):** a run longer than the ticket dies with rc 126. Use a renewable ticket in a fixed cache, renewed hourly. `run-pairs.sh` waits rather than fails while there is no ticket (`WC_KRB_WAIT=1`).
 - **`pgrep -f` / `pkill -f <pattern>` match your own shell's command line.** Use `pkill -x <comm>` or explicit PIDs.
@@ -41,7 +41,7 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 
 ## What to report after a run
 
-Report `pool.log`, `cost-summary.md` (time, CPU, RSS and disk per step, per event), and the number of pairs `OK` / `FAIL` with their failing step. Also report every `validate.json` that is not `PASS`, with its first problems, and any `pr-try1/` (crash) units. Append it to the tracking issue.
+Report the `PARTIAL` pairs with their `events.json` (skipped events, failed tars), as well as `pool.log`, `cost-summary.md` (time, CPU, RSS and disk per step, per event), and the number of pairs `OK` / `FAIL` with their failing step. Also report every `validate.json` that is not `PASS`, with its first problems, and any `pr-try1/` (crash) units. Append it to the tracking issue.
 
 ## Deploying on Aurora (first time, or after a pin change)
 
