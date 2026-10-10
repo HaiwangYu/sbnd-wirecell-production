@@ -19,7 +19,7 @@ print('# cost summary: %s\n\npairs: %s; %d events with Wire-Cell output\n' % (W,
 print('| step | runs | wall total [s] | wall per event [s] | CPU per event [s] | max RSS: median / max [MB] | output total [MB] | output per event [MB] |')
 print('|---|---|---|---|---|---|---|---|')
 num = lambda R, k: [float(r[k]) for r in R if r.get(k) not in ('', None)]
-for s in ('step1', 'step2', 'step3', 'validate'):
+for s in ('step0', 'step1', 'step2', 'step3', 'validate'):
     R = [r for r in rows if r['step'] == s and r['rc'] == '0']
     if not R: continue
     rss = sorted(num(R, 'maxrss_MB')) or [0]

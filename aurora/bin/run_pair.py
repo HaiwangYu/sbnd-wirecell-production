@@ -9,6 +9,9 @@ with /usr/bin/time -v and wrapped in `timeout -k 60 <limit>`.
 Exception handling (ai-helper issue 39 log (c)):
   precheck   reco1 and CAF must exist and be non-empty; a /pnfs path must be ONLINE (dCache
              locality), else the pair stops here: "FAIL precheck <why>", no compute spent.
+  step 0     DATA only (WC_FRAMESHIFT=1, the default for data): step0-frameshift.sh copies the
+             reco1 into <id>/fs/ with the FrameShift product, and step 1 reads that copy.  Run
+             once, before the first step-1 job; failure -> "FAIL step0".  Timeout WC_TIMEOUT_STEP0.
   step 1     timeout = WC_TIMEOUT_STEP1_BASE + WC_TIMEOUT_STEP1_PER_EVENT * events.  If lar fails
              or times out, the event it was on (the last "<OpHitSource:tpc0> run R subrun S event E"
              line of lar.log) is skipped and the rest of that slice is rerun as two slices
@@ -23,8 +26,14 @@ Exception handling (ai-helper issue 39 log (c)):
              FAIL <stage> <why>.
   attempts   every failed try is moved to <id>/attempts/<step>-<tag>-try<k>/ and kept.
 Resume: a rerun reuses every step-1 slice / step-2 tar that has a DONE marker.
+Keep (WC_KEEP): "all" (default) keeps everything; "minimal" deletes the large intermediates once
+  the pair is merged and validated (OK or PARTIAL): the FrameShift copy (already after step 1),
+  every *.root / *.zip / *.h5 and pr_evt*/ under ql/, pr/ and attempts/, and failed tries'
+  qlpctree.tar.gz.  Kept: ql/<tag>/qlpctree.tar.gz, merged/, and the logs.  The pr/<tag>/DONE
+  markers go too, so a rerun (WC_RETRY_PARTIAL=1) redoes step 2 from the kept tars.  A FAIL pair
+  keeps everything for debugging.
 
-Layout <workdir>/<id>/: ql/<tag>/ (step 1, tag "all" or "s<a>-<b>"), pr/<tag>/ (step 2),
+Layout <workdir>/<id>/: fs/ (step 0, data), ql/<tag>/ (step 1, tag "all" or "s<a>-<b>"), pr/<tag>/ (step 2),
 attempts/, merged/, good.txt, events.json, validate.json, cost.tsv, status.
 """
 import glob
@@ -50,6 +59,11 @@ T3 = int(E.get('WC_TIMEOUT_STEP3', 1800))
 TV = int(E.get('WC_TIMEOUT_VALIDATE', 3600))
 MAX_BAD = int(E.get('WC_STEP1_MAX_BAD', 3))
 ATTEMPTS2 = int(E.get('WC_STEP2_ATTEMPTS', 2))
+T0 = int(E.get('WC_TIMEOUT_STEP0', 1800))
+FRAMESHIFT = E.get('WC_FRAMESHIFT', '1' if REAL == 'data' else '0') == '1'
+KEEP = E.get('WC_KEEP', 'all')
+if KEEP not in ('all', 'minimal'):
+    sys.exit('run_pair.py: WC_KEEP must be all or minimal')
 COST = os.path.join(D, 'cost.tsv')
 
 
@@ -143,6 +157,24 @@ for what, p in (('reco1', RECO1), ('caf', CAF)):
     if not ok:
         finish('FAIL precheck %s %s' % (what, why))
 
+# ---------------------------------------------------------------- step 0: FrameShift (data)
+FSDIR = os.path.join(D, 'fs')
+FSCOPY = os.path.join(FSDIR, os.path.basename(RECO1)[:-len('.root')] + '_frameshift.root')
+
+
+def step1_input():
+    """The file step 1 reads: the reco1, or (data) its FrameShift copy, made on first use."""
+    if not FRAMESHIFT:
+        return RECO1
+    if not os.path.exists(FSCOPY):
+        rc, tf = container('step0', [os.path.join(BIN, 'step0-frameshift.sh'), RECO1, FSCOPY], T0)
+        cost_row('step0', 'all', 1, rc, tf, FSCOPY)
+        if rc != 0:
+            finish('FAIL step0 frameshift rc %d (see fs/frameshift-lar.log.gz, cost/step0.out)' % rc)
+        log('step0 FrameShift copy %s' % FSCOPY)
+    return FSCOPY
+
+
 # ---------------------------------------------------------------- step 1 (fixes 2, 4, 5)
 nfile = os.path.join(D, 'reco1_events')
 if not os.path.exists(nfile):
@@ -182,7 +214,7 @@ while slices:
         tars.append((tag, b - a, os.path.join(qdir, 'qlpctree.tar.gz')))
         continue
     os.makedirs(qdir, exist_ok=True)
-    rc, tf = container('step1-' + tag, [os.path.join(BIN, 'step1.sh'), RECO1, qdir, REAL, str(a), str(b - a)],
+    rc, tf = container('step1-' + tag, [os.path.join(BIN, 'step1.sh'), step1_input(), qdir, REAL, str(a), str(b - a)],
                        T1B + T1E * (b - a))
     cost_row('step1', tag, 1, rc, tf, qdir)
     if rc == 0:
@@ -212,6 +244,9 @@ while slices:
 
 if not tars:
     finish('FAIL step1 no step-1 output', skipped=skipped, lost_slices=lost)
+if KEEP == 'minimal' and os.path.isdir(FSDIR):
+    for f in glob.glob(os.path.join(FSDIR, '*.root*')):
+        os.remove(f)
 
 # ---------------------------------------------------------------- step 2 (fixes 2, 3, 5)
 pr_dirs, failed_dirs, step2_failed = [], [], []
@@ -270,6 +305,37 @@ if E.get('WC_VALIDATE', '1') == '1':
     cost_row('validate', 'all', 1, rc, tf, None)
     if rc != 0:
         finish('FAIL validate rc %d' % rc, skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
+
+
+def cleanup_minimal():
+    """WC_KEEP=minimal: keep qlpctree.tar.gz (final slices), merged/ and the logs; delete the rest."""
+    n, mb = 0, 0.0
+
+    def rm(p):
+        nonlocal n, mb
+        mb += du_mb(p)
+        n += 1
+        shutil.rmtree(p) if os.path.isdir(p) else os.remove(p)
+    big = ('.root', '.zip', '.h5', '.tar.gz', '.root.tmp')
+    for f in glob.glob(os.path.join(FSDIR, '*.root*')):
+        rm(f)
+    for qd in glob.glob(os.path.join(D, 'ql', '*')) + glob.glob(os.path.join(D, 'attempts', 'step1-*')):
+        final = os.path.dirname(qd) == os.path.join(D, 'ql')
+        for f in os.listdir(qd):
+            if f.endswith(big) and not (final and f == 'qlpctree.tar.gz'):
+                rm(os.path.join(qd, f))
+    for pd in glob.glob(os.path.join(D, 'pr', '*')) + glob.glob(os.path.join(D, 'attempts', 'step2-*')):
+        for f in os.listdir(pd):
+            if f.startswith('pr_evt') or f.endswith(big) or f == 'DONE':
+                rm(os.path.join(pd, f))
+    left = [(du_mb(os.path.join(dp, f)), os.path.join(dp, f)) for dp, _, fs in os.walk(D) for f in fs
+            if not dp.startswith(mdir) and f != 'qlpctree.tar.gz']
+    left = [x for x in left if x[0] > 5]
+    log('keep=minimal: removed %d files/dirs, %.1f MB%s' % (n, mb, ('; still > 5 MB: %s' % left) if left else ''))
+
+
+if KEEP == 'minimal':
+    cleanup_minimal()
 mj = json.load(open(os.path.join(mdir, 'merge.json')))
 missing = mj['n_caf_events_without_wirecell']
 info = dict(skipped=skipped, lost_slices=lost, step2_failed=step2_failed, caf_events=mj['n_caf_events'],

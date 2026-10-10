@@ -7,6 +7,7 @@ Development and validation are tracked in [ai-helper #39](https://github.com/Hai
 ## The three steps
 
 ```
+                (data only: step 0 = run_frameshift.fcl, a local copy with FrameShift)
 reco1 artROOT ──step 1──▶ qlpctree.tar.gz ──step 2──▶ pr_evt<E>/tracking-pr.root ──step 3──▶ <caf>.wc.flat.caf.root
   (lar, larwirecell)        (one per reco1)  (wire-cell, standalone)   (one per event)      (merge)  (flat CAF + recTreeWireCell)
                                                                                      ▲
@@ -15,6 +16,7 @@ reco1 artROOT ──step 1──▶ qlpctree.tar.gz ──step 2──▶ pr_evt
 
 | step | what | program | output |
 |---|---|---|---|
+| 0 | data only: copy the reco1 with the FrameShift product (Gen2 data needs it for the light matching) | `bin/step0-frameshift.sh` → `lar -c run_frameshift.fcl` | `<id>/fs/<reco1>_frameshift.root` (intermediate) |
 | 1 | imaging, clustering, charge-light matching, all-APA clustering; MC truth tables; the art input file name as metadata | `bin/step1.sh` → `lar -c wcls-img-clus-matching{,-data}.fcl` | `qlpctree.tar.gz`, `mabc.zip` (Bee), `nugraph.h5` |
 | 2 | pattern recognition, taggers, BDT scores, DL vertex (with the dump), and the per-event flat tree | `bin/step2.sh` → `wire-cell -c pgrapher/experiment/sbnd/wct-pr.jsonnet --tla-code flat_tree=true` | `pr_evt<E>/tracking-pr.root` (row trees + `recTreeWireCell`), `mabc-pr.zip` |
 | 3 | copy the flat CAF unchanged and add `recTreeWireCell`, aligned with `recTree` by run / subrun / event | `bin/merge-caf.py` | `<name>.wc.flat.caf.root` |
@@ -35,12 +37,15 @@ bin/run-pairs.sh site/<site>.sh pairs.tsv <workdir>
 cat <workdir>/pool.log <workdir>/cost-summary.md
 ```
 - Sites: `site/fnal-sbndbuild03.sh` (FNAL, SL7 via `in-gpvm-sl7.sh`) and `site/aurora.sh` (ALCF Aurora compute node; `pbs/run-pairs.pbs`).
+- Disk: `WC_KEEP=minimal bin/run-pairs.sh …` keeps only `ql/<tag>/qlpctree.tar.gz`, `merged/` and the logs of each validated pair (the FrameShift copy, `mabc.zip`, `nugraph.h5`, `pr_evt*/`, `mabc-pr.zip` are deleted); the default `all` keeps everything. A `FAIL` pair always keeps everything.
+- `site/fnal-sbndbuild03-60pct.sh`: 60 % of sbndbuild03 (cores 26–63, 38 pairs at night and on weekends, 19 in the weekday daytime, 70 GB guard), owner-approved for the open-data run only.
 - Rerunning `run-pairs.sh` on the same work dir resumes: pairs with `status` `OK` or `PARTIAL` are skipped, and a `FAIL` pair reuses its finished step-1 slices and step-2 tars.
 
 ## When something goes wrong (`bin/run_pair.py`)
 
 | situation | what happens | `status` |
 |---|---|---|
+| data: `run_frameshift.fcl` fails, or the copy lacks FrameShift / lost events (`WC_TIMEOUT_STEP0`, 1800 s) | stops before step 1 | `FAIL step0 …` |
 | CAF or reco1 missing, empty, or on tape (dCache locality not `ONLINE`) | stops before any compute | `FAIL precheck …` |
 | step 1 (`lar`) crashes or exceeds `WC_TIMEOUT_STEP1_BASE` + `_PER_EVENT` × events (900 + 300 s) | the failing event is found from the log (the last `<OpHitSource:tpc0> run R subrun S event E` line). It is skipped, and the rest is rerun as two slices with `--nskip`/`-n`, recursively, up to `WC_STEP1_MAX_BAD` (3) skipped events per file | `PARTIAL` (skipped events in `events.json`) |
 | step 2 (`wire-cell`) crashes, exceeds `WC_TIMEOUT_STEP2_BASE` + `_PER_EVENT` × events (600 + 300 s), has a DL failure or misses a flat tree | retried, `WC_STEP2_ATTEMPTS` (2) tries per tar | `OK` if a try succeeds |

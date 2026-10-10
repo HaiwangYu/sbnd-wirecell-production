@@ -8,7 +8,7 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 
 1. **Never commit or push on your own** to the toolkit, larwirecell or wcp-porting-validation. Leave changes for the owner, Haiwang. Pushing to this repo and to the ai-helper repo is fine when asked.
 2. **Everything builds and runs inside the SL7 container**: `env/fnal/` or `env/aurora/`, through the site's `WC_WRAP`. A host build links the wrong glibc and fails only at plugin load.
-3. **Shared machines (FNAL sbndbuild03):** never more than half the machine, and half again in the day (08:00–20:00). `site/fnal-sbndbuild03.sh` encodes this: cores 32–63, 14 pairs in the day and 28 at night, a 50 GB RSS guard, a 15 GB machine-available guard. Do not raise these without the owner.
+3. **Shared machines (FNAL sbndbuild03):** never more than half the machine, and half again in the day (08:00–20:00). `site/fnal-sbndbuild03.sh` encodes this: cores 32–63, 14 pairs in the day and 28 at night, a 50 GB RSS guard, a 15 GB machine-available guard. Do not raise these without the owner. The one exception the owner approved (2026-10-10) is `site/fnal-sbndbuild03-60pct.sh`, for the open FixedDev BNB data run.
 4. **Never edit anything under `sbnd_xin/`** (Xin's area): read and run only.
 5. **Blinded data:** the SBND2026A `gen2_BNB-Run1` set is blinded. Never use it.
 6. **Ask the owner** when a choice changes what gets produced.
@@ -28,7 +28,8 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 - **The DL vertex fails silently.** Without the scn product and `SCN_Vertex.py` on `PYTHONPATH`, every candidate logs `DL vertex failed: … No module named …`, falls back to the traditional vertex, and the job exits 0.
   - `step2.sh` refuses to start without the imports and fails if `pr/dl_fail` > 0.
   - On FNAL the setup must be sourced in the same shell as the job (`env/fnal/setup-fnal-run.sh` as `SL7_SETUP`), because `setup-dlvtx.sh` needs a shell function.
-- **Data needs FrameShift.** Gen2 data reco1 must go through `run_frameshift.fcl` first. Without the product, step 1 silently uses a shift of 0, and the light matching is wrong. `step1.sh` warns when every event has `frame_apply_at_caf 0 ns` on data. MC has no product by design.
+- **Data needs FrameShift.** Gen2 data reco1 must go through `run_frameshift.fcl` first. Without the product, step 1 silently uses a shift of 0, and the light matching is wrong. `run_pair.py` now does this itself for `data` pairs (step 0, `bin/step0-frameshift.sh`; `WC_FRAMESHIFT=0` turns it off for input that already has it). `step1.sh` still warns when every event has `frame_apply_at_caf 0 ns` on data. MC has no product by design.
+- **Data pairs by SAM:** for the MCP2025C data, the CAF that is a direct child of the reco1 is the gen2 Respin one (`data_SBND2026A_SBND2026A_gen2_run1_BNBLight_Data_FixedDev_Respin_v10_14_02_04_flatcaf_sbnd`). The MCP2025C `..._flatcaf_sbnd` CAFs were made from the raw file in one job and are siblings, which `find-pairs.py` does not match.
 - **The intermittent PR crash.** Step 2 segfaults now and then (`TrackFitting::update_association`, `SteinerGrapher`; peak RSS ~4.5 GB), much more often on nueCC (~1 per 550 events) than on BNB CV (~1 per 13,000).
   - A crash also leaves the previous event's `tracking-pr.root` as a stub.
   - `run_pair.py` retries a failed tar once (`WC_STEP2_ATTEMPTS`) and keeps every failed try under `attempts/`. If all tries fail, it still merges the complete events of all tries, giving `PARTIAL`.

@@ -10,7 +10,8 @@
 
 Name rule (path mode): reco1 "X.root"  <->  CAF "reco2-X.flat.caf.root" (FNAL dCache)
                                         or  "reco2-X.caf.root"       (the Aurora copies).
-pairs.tsv columns: id, reality, reco1 path, caf path, reco1 events (from SAM, or "-").
+pairs.tsv columns: id, reality, reco1 path, caf path, reco1 events (SAM "Event Count", else
+sbn_dm.event_count, else "-").
 A reco1 without exactly one CAF is reported and skipped.
 """
 import argparse
@@ -78,10 +79,16 @@ if a.reco1_samdef:
         if not r1 or not cf:
             skipped.append((n, 'cannot locate'))
             continue
-        nev = '-'
+        # SAM "Event Count" is None for the data reco1; sbn_dm.event_count is filled for MC and data
+        nev, nev_dm = '-', '-'
         for line in samweb('get-metadata', n).splitlines():
-            if line.strip().startswith('Event Count:'):
-                nev = line.split(':')[1].strip()
+            k, _, v = line.strip().partition(':')
+            if k == 'Event Count' and v.strip().isdigit():
+                nev = v.strip()
+            elif k == 'sbn_dm.event_count' and v.strip().isdigit():
+                nev_dm = v.strip()
+        if nev == '-':
+            nev = nev_dm
         pairs.append((r1, cf, nev))
 else:
     if not a.caf_dir:

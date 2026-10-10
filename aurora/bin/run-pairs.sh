@@ -10,7 +10,8 @@
 # handling described there: timeouts, step-1 slicing around a failing event, step-2 retries,
 # partial merge, every failed try kept).  The concurrency
 # limit is re-read before every launch: WC_MAXPAR, or WC_DAY_MAXPAR between WC_DAY_START and
-# WC_DAY_END local time, or a number in <workdir>/maxpar.override (live; delete to go back).
+# WC_DAY_END local time on Monday-Friday (WC_WEEKEND_DAY_MAXPAR on Saturday/Sunday, default
+# WC_DAY_MAXPAR), or a number in <workdir>/maxpar.override (live; delete to go back).
 # No launch while our RSS > WC_MEM_GUARD_GB or the machine has < WC_SYS_MIN_AVAIL_GB available,
 # or (WC_KRB_WAIT=1, FNAL) while there is no Kerberos ticket.  Running pairs are never killed.
 # Pairs whose <id>/status is OK or PARTIAL are skipped (WC_RETRY_PARTIAL=1 reruns PARTIAL ones);
@@ -25,7 +26,7 @@ LOG=$WORK/pool.log
 {
   echo "start   $(/bin/date '+%F %T %Z') on $(hostname)  site $SITE"
   echo "pairs   $(grep -vc '^#' "$PAIRS")  schema $SCHEMA (md5 $(md5sum < "$SCHEMA" | cut -c1-12))"
-  echo "limits  MAXPAR $WC_MAXPAR, day $WC_DAY_MAXPAR ($WC_DAY_START-$WC_DAY_END), CPUSET '${WC_CPUSET:-}', mem guard ${WC_MEM_GUARD_GB} GB, min avail ${WC_SYS_MIN_AVAIL_GB} GB"
+  echo "limits  MAXPAR $WC_MAXPAR, day $WC_DAY_MAXPAR ($WC_DAY_START-$WC_DAY_END; weekend day ${WC_WEEKEND_DAY_MAXPAR:-$WC_DAY_MAXPAR}), keep ${WC_KEEP:-all}, CPUSET '${WC_CPUSET:-}', mem guard ${WC_MEM_GUARD_GB} GB, min avail ${WC_SYS_MIN_AVAIL_GB} GB"
 } >> "$WORK/RUN-RECORD.txt"
 
 cur_maxpar() {
@@ -33,7 +34,9 @@ cur_maxpar() {
   o=$(cat "$WORK/maxpar.override" 2>/dev/null)
   if [[ $o =~ ^[0-9]+$ ]] && [ "$o" -gt 0 ]; then echo "$o"; return; fi
   h=$((10#$(/bin/date +%H)))
-  if [ $h -ge "$WC_DAY_START" ] && [ $h -lt "$WC_DAY_END" ]; then echo "$WC_DAY_MAXPAR"; else echo "$WC_MAXPAR"; fi
+  if [ $h -ge "$WC_DAY_START" ] && [ $h -lt "$WC_DAY_END" ]; then
+    if [ "$(/bin/date +%u)" -ge 6 ]; then echo "${WC_WEEKEND_DAY_MAXPAR:-$WC_DAY_MAXPAR}"; else echo "$WC_DAY_MAXPAR"; fi
+  else echo "$WC_MAXPAR"; fi
 }
 ourmem_gb() { ps -u "$USER" -o rss=,comm= | awk '$2 ~ /^(lar|wire-cell|python3)$/ {s+=$1} END {printf "%d", s/1048576}'; }
 sys_avail_gb() { awk '/MemAvailable/ {printf "%d", $2/1048576}' /proc/meminfo; }
