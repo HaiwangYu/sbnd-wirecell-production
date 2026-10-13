@@ -6,13 +6,16 @@
 # unless DLVTX_DUMP=false.
 set -u
 TAR=${1:?tar}; OUT=${2:?outdir}; REAL=${3:?sim|data}; DUMP=${DLVTX_DUMP:-true}
+# ai-helper issue 41: reco<->truth matching trees on MC (needs the step-1 labeler's
+# truth_track table; written nowhere else).  WC_TRUTH_MATCH=0 turns it off.
+TM=false; [ "$REAL" = sim ] && [ "${WC_TRUTH_MATCH:-1}" = 1 ] && TM=true
 mkdir -p "$OUT" && cd "$OUT" || exit 2
 # Without these the DL vertex fails SILENTLY (WARN + traditional vertex, rc 0) -- refuse to run.
 python3 -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(m) for m in ('SCN_Vertex', 'torch', 'sparseconvnet')) else 1)" \
   || { echo "step2.sh: SCN_Vertex/torch/sparseconvnet not importable (DL environment missing)" >&2; exit 97; }
 wire-cell -l stdout -L debug -c pgrapher/experiment/sbnd/wct-pr.jsonnet \
   --tla-str input="$TAR" --tla-str reality="$REAL" \
-  --tla-code dl_vtx_dump="$DUMP" --tla-code flat_tree=true > wct.log 2>&1
+  --tla-code dl_vtx_dump="$DUMP" --tla-code flat_tree=true --tla-code truth_match=$TM > wct.log 2>&1
 rc=$?
 grep -c "DL vertex failed" wct.log > dl_fail
 grep -c "RootFlatTreeVisitor.*no recTreeWireCell written" wct.log > flat_fail

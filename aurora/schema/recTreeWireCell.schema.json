@@ -3,12 +3,16 @@
  "prefix": "wc",
  "trees": [
   "T_bad_ch",
+  "T_blob_truth",
   "T_bundle",
   "T_cluster",
   "T_dlvtx_call",
   "T_dlvtx_cloud",
   "T_flash",
   "T_kine",
+  "T_match",
+  "T_overlap",
+  "T_pf",
   "T_proj",
   "T_proj_data",
   "T_rec_charge",
@@ -16,31 +20,27 @@
   "T_tagger",
   "T_truth_nu",
   "T_truth_pf",
+  "T_truth_track",
   "Trun"
  ],
  "references": [
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/m1-test/pr/pr_evt1/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/m1-test/pr/pr_evt3/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt16663/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt16883/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17037/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17257/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17389/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17433/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17499/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17675/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17697/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt17829/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt18115/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt18665/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt18709/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt18819/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt19193/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt19391/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt19479/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt19633/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt19721/tracking-pr.root",
-  "/exp/sbnd/data/users/yuhw/production-prep/caf-merge-dev/ref-data/pr/pr_evt19743/tracking-pr.root"
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt17/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt19/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt1/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt21/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt23/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt24/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt2/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt30/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt32/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt34/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt37/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt41/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt43/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt44/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt45/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt46/tracking-pr.root",
+  "/exp/sbnd/data/users/yuhw/production-prep/truthmatch-41/dbg-blob/pr_evt49/tracking-pr.root"
  ],
  "branches": [
   {
@@ -1687,6 +1687,596 @@
    "name": "wc.T_dlvtx_cloud.q",
    "type": "Float_t",
    "count": "wc.T_dlvtx_cloud..length"
+  },
+  {
+   "name": "wc.T_truth_track..length",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_truth_track.runNo",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.subRunNo",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.eventNo",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.trackid",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.nu_idx",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.bee_trackid",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.ancestor_trackid",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.prong_trackid",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.pdg",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.mother_trackid",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.mother_pdg",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.process",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.q_readout",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.e_readout",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.q_in_blobs",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.n_blobs_dom",
+   "type": "Int_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.q_dom_blobs",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.start_x",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.start_y",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.start_z",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.start_t",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.start_E",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.end_x",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.end_y",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_truth_track.end_z",
+   "type": "Double_t",
+   "count": "wc.T_truth_track..length"
+  },
+  {
+   "name": "wc.T_overlap..length",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_overlap.runNo",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.subRunNo",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.eventNo",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.nu_index",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.cluster_id",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.segment_id",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.particle_id",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.kine_index",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.in_enu",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.in_pf",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.trackid",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.nu_idx",
+   "type": "Int_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.n_points",
+   "type": "Float_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.q",
+   "type": "Float_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.n_pure",
+   "type": "Float_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_overlap.q_pure",
+   "type": "Float_t",
+   "count": "wc.T_overlap..length"
+  },
+  {
+   "name": "wc.T_match..length",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_match.runNo",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.subRunNo",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.eventNo",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.level",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.side",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.obj",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.nu_index",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.cluster_id",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.kine_index",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.truth_nu_idx",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.truth_trackid",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.size_n",
+   "type": "Float_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.size_q",
+   "type": "Float_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.n_unlabeled",
+   "type": "Float_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.q_unlabeled",
+   "type": "Float_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.truth_q_readout",
+   "type": "Float_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.truth_q_in_blobs",
+   "type": "Float_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.nmatch",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_obj..totarraysize",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_match.match_obj..length",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_obj..idx",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_obj",
+   "type": "Int_t",
+   "count": "wc.T_match.match_obj..totarraysize"
+  },
+  {
+   "name": "wc.T_match.match_iou_n..totarraysize",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_match.match_iou_n..length",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_iou_n..idx",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_iou_n",
+   "type": "Float_t",
+   "count": "wc.T_match.match_iou_n..totarraysize"
+  },
+  {
+   "name": "wc.T_match.match_iou_q..totarraysize",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_match.match_iou_q..length",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_iou_q..idx",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_iou_q",
+   "type": "Float_t",
+   "count": "wc.T_match.match_iou_q..totarraysize"
+  },
+  {
+   "name": "wc.T_match.match_shared_n..totarraysize",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_match.match_shared_n..length",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_shared_n..idx",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_shared_n",
+   "type": "Float_t",
+   "count": "wc.T_match.match_shared_n..totarraysize"
+  },
+  {
+   "name": "wc.T_match.match_shared_q..totarraysize",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_match.match_shared_q..length",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_shared_q..idx",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_match.match_shared_q",
+   "type": "Float_t",
+   "count": "wc.T_match.match_shared_q..totarraysize"
+  },
+  {
+   "name": "wc.T_match.mutual",
+   "type": "Int_t",
+   "count": "wc.T_match..length"
+  },
+  {
+   "name": "wc.T_pf..length",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_pf.runNo",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.subRunNo",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.eventNo",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.nu_index",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.node_id",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.parent_id",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.depth",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.n_children",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.name..totarraysize",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_pf.name..length",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.name..idx",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.name",
+   "type": "Char_t",
+   "count": "wc.T_pf.name..totarraysize"
+  },
+  {
+   "name": "wc.T_pf.pdg",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.is_pseudo",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.kine_index",
+   "type": "Int_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.ke_mev",
+   "type": "Float_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.start_x",
+   "type": "Float_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.start_y",
+   "type": "Float_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.start_z",
+   "type": "Float_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.end_x",
+   "type": "Float_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.end_y",
+   "type": "Float_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_pf.end_z",
+   "type": "Float_t",
+   "count": "wc.T_pf..length"
+  },
+  {
+   "name": "wc.T_blob_truth..length",
+   "type": "Int_t",
+   "count": null
+  },
+  {
+   "name": "wc.T_blob_truth.runNo",
+   "type": "Int_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.subRunNo",
+   "type": "Int_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.eventNo",
+   "type": "Int_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.cluster_id",
+   "type": "Int_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.npoints",
+   "type": "Int_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.charge",
+   "type": "Float_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.trackid",
+   "type": "Int_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.truth_q",
+   "type": "Float_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.truth_q_dom",
+   "type": "Float_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.trackid2",
+   "type": "Int_t",
+   "count": "wc.T_blob_truth..length"
+  },
+  {
+   "name": "wc.T_blob_truth.truth_q2",
+   "type": "Float_t",
+   "count": "wc.T_blob_truth..length"
   },
   {
    "name": "wc.T_proj..length",

@@ -18,7 +18,7 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 | gate | how | pass |
 |---|---|---|
 | G1 builds are the pinned branches | `git -C <toolkit> log -1`, `git -C <larwirecell> log -1`; the toolkit `cfg/` must be clean (it is used live via `WIRECELL_PATH`) | toolkit `sbnd-wc-flatcaf` head, larwirecell `sbnd-wc-flatcaf` head |
-| G2 the binary knows the new code | `nm -D --defined-only $OPT/lib/libWireCellRoot.so \| grep make_RootFlatTreeVisitor_factory`; `nm -DC <larwirecell lib>/libWireCellLarsoft.so \| grep respond_to_open_input_file` | both found |
+| G2 the binary knows the new code | `nm -D --defined-only $OPT/lib/libWireCellRoot.so \| grep make_RootFlatTreeVisitor_factory`; `nm -DC <larwirecell lib>/libWireCellLarsoft.so \| grep respond_to_open_input_file`; `strings $OPT/lib/libWireCellRoot.so \| grep -c '^T_overlap$'`; `strings <larwirecell lib>/libWireCellAIML.so \| grep -c prong_trackid` | all found |
 | G3 compiled config | with `flat_tree` off, every SBND job compiles byte-identically to the previous pin; with `--tla-code flat_tree=true`, the step-2 config gains exactly `RootFlatTreeVisitor:pr`, last in the `clus_pr` pipeline (ai-helper `issues/38-*/scripts/cfg-proof.py`) | as stated |
 | G4 smoke | `bin/run-pairs.sh` on 1–2 pairs | `status` `OK`, `validate.json` `PASS`, `pr/dl_fail` 0 |
 | G5 schema | an unknown branch makes `merge-caf.py` fail loudly. After a toolkit change that adds branches, rebuild with `bin/make-schema.py` from an MC event with a neutrino candidate plus a data event, commit the new schema, and say so | `merge-caf.py` never fails on the schema |
