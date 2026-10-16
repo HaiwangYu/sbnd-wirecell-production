@@ -3,6 +3,10 @@
 
     # by SAM definition (FNAL, or anywhere samweb works): the CAF is the reco1's child
     find-pairs.py --reco1-samdef <def> --caf-samdef <flatcaf def> --reality sim [--limit N] [--offset K] -o pairs.tsv
+    # ... or a list of reco1 file NAMES (SAM still finds the CAFs), e.g. a past production's selection
+    find-pairs.py --reco1-names names.txt --caf-samdef <flatcaf def> --reality data -o pairs.tsv
+    # --caf-relation sibling: the CAF was made from the raw file in one job (decode -> reco1 -> reco2 ->
+    # caf), so it is the reco1's SIBLING through their common raw parent (MCP2025C and gen2 InTime data)
     # by path: list or directory of reco1 files, CAFs found by name in a directory tree
     find-pairs.py --reco1-dir <dir> | --reco1-list <file> --caf-dir <dir> --reality sim [--limit N] -o pairs.tsv
     # samweb file locations can be rewritten to a local mirror (e.g. Aurora's copy of /pnfs):
@@ -24,6 +28,9 @@ src = ap.add_mutually_exclusive_group(required=True)
 src.add_argument('--reco1-samdef')
 src.add_argument('--reco1-dir')
 src.add_argument('--reco1-list')
+src.add_argument('--reco1-names', help='file with reco1 file names, one per line (SAM mode)')
+ap.add_argument('--caf-relation', choices=['child', 'sibling'], default='child',
+                help='child: the CAF is a child of the reco1; sibling: both are children of one raw file')
 ap.add_argument('--caf-samdef', help='SAM definition the CAF must belong to (SAM mode; a reco1 has several CAF-like children)')
 ap.add_argument('--caf-dir', help='directory tree holding the CAFs (path mode)')
 ap.add_argument('--reality', required=True, choices=['sim', 'data'])
@@ -63,17 +70,27 @@ def cafname_candidates(reco1):
 
 
 pairs, skipped = [], []
-if a.reco1_samdef:
+if a.reco1_samdef or a.reco1_names:
     if not a.caf_samdef:
         sys.exit('--caf-samdef is required in SAM mode (a reco1 has several CAF-like children)')
-    names = samweb('list-files', 'defname: %s' % a.reco1_samdef).split()
+    if a.reco1_samdef:
+        names = samweb('list-files', 'defname: %s' % a.reco1_samdef).split()
+    else:
+        names = [l.strip() for l in open(a.reco1_names) if l.strip() and not l.startswith('#')]
     names = sorted(names)[a.offset:]
     for n in names:
         if a.limit and len(pairs) >= a.limit:
             break
-        kids = samweb('list-files', 'defname: %s and ischildof:( file_name %s )' % (a.caf_samdef, n)).split()
+        if a.caf_relation == 'child':
+            kids = samweb('list-files', 'defname: %s and ischildof:( file_name %s )' % (a.caf_samdef, n)).split()
+        else:
+            raw = samweb('file-lineage', 'parents', n).split()
+            if len(raw) != 1:
+                skipped.append((n, '%d parents (sibling mode needs one raw file)' % len(raw)))
+                continue
+            kids = samweb('list-files', 'defname: %s and ischildof:( file_name %s )' % (a.caf_samdef, raw[0])).split()
         if len(kids) != 1:
-            skipped.append((n, '%d CAF children in %s' % (len(kids), a.caf_samdef)))
+            skipped.append((n, '%d CAF %s in %s' % (len(kids), 'children' if a.caf_relation == 'child' else 'siblings', a.caf_samdef)))
             continue
         r1, cf = locate(n), locate(kids[0])
         if not r1 or not cf:
@@ -119,3 +136,8 @@ with open(a.output, 'w') as f:
 print('%s: %d pairs, %d skipped' % (a.output, len(pairs), len(skipped)))
 for n, why in skipped[:20]:
     print('  skipped %s: %s' % (n, why))
+if skipped:
+    with open(a.output + '.skipped', 'w') as f:
+        for n, why in skipped:
+            f.write('%s\t%s\n' % (n, why))
+    print('  all skipped reco1 files: %s.skipped' % a.output)

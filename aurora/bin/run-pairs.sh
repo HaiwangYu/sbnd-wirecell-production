@@ -11,7 +11,11 @@
 # partial merge, every failed try kept).  The concurrency
 # limit is re-read before every launch: WC_MAXPAR, or WC_DAY_MAXPAR between WC_DAY_START and
 # WC_DAY_END local time on Monday-Friday (WC_WEEKEND_DAY_MAXPAR on Saturday/Sunday, default
-# WC_DAY_MAXPAR), or a number in <workdir>/maxpar.override (live; delete to go back).
+# WC_DAY_MAXPAR), or a number in <control>/maxpar.override (live; delete to go back).
+# <control> = WC_CONTROL_DIR (default the work dir): several pools can share one control dir, and
+# bin/load-governor.sh writes maxpar.override / memguard.override there from the machine's load.
+# WC_GLOBAL=1: the limit counts EVERY run_pair.py of this user (all pools together), not only this
+# pool's, so concurrent pools share one budget.
 # No launch while our RSS > WC_MEM_GUARD_GB or the machine has < WC_SYS_MIN_AVAIL_GB available,
 # or (WC_KRB_WAIT=1, FNAL) while there is no Kerberos ticket.  Running pairs are never killed.
 # Pairs whose <id>/status is OK or PARTIAL are skipped (WC_RETRY_PARTIAL=1 reruns PARTIAL ones);
@@ -29,15 +33,21 @@ LOG=$WORK/pool.log
   echo "limits  MAXPAR $WC_MAXPAR, day $WC_DAY_MAXPAR ($WC_DAY_START-$WC_DAY_END; weekend day ${WC_WEEKEND_DAY_MAXPAR:-$WC_DAY_MAXPAR}), keep ${WC_KEEP:-all}, CPUSET '${WC_CPUSET:-}', mem guard ${WC_MEM_GUARD_GB} GB, min avail ${WC_SYS_MIN_AVAIL_GB} GB"
 } >> "$WORK/RUN-RECORD.txt"
 
+CTRL=${WC_CONTROL_DIR:-$WORK}
 cur_maxpar() {
   local o h
-  o=$(cat "$WORK/maxpar.override" 2>/dev/null)
+  o=$(cat "$CTRL/maxpar.override" 2>/dev/null)
   if [[ $o =~ ^[0-9]+$ ]] && [ "$o" -gt 0 ]; then echo "$o"; return; fi
   h=$((10#$(/bin/date +%H)))
   if [ $h -ge "$WC_DAY_START" ] && [ $h -lt "$WC_DAY_END" ]; then
     if [ "$(/bin/date +%u)" -ge 6 ]; then echo "${WC_WEEKEND_DAY_MAXPAR:-$WC_DAY_MAXPAR}"; else echo "$WC_DAY_MAXPAR"; fi
   else echo "$WC_MAXPAR"; fi
 }
+cur_memguard() {
+  local o; o=$(cat "$CTRL/memguard.override" 2>/dev/null)
+  if [[ $o =~ ^[0-9]+$ ]] && [ "$o" -gt 0 ]; then echo "$o"; else echo "$WC_MEM_GUARD_GB"; fi
+}
+running_global() { ps -u "$USER" -o args= | grep -c '[b]in/run_pair\.py'; }
 ourmem_gb() { ps -u "$USER" -o rss=,comm= | awk '$2 ~ /^(lar|wire-cell|python3)$/ {s+=$1} END {printf "%d", s/1048576}'; }
 sys_avail_gb() { awk '/MemAvailable/ {printf "%d", $2/1048576}' /proc/meminfo; }
 
@@ -48,8 +58,12 @@ while IFS=$'\t' read -r id real r1 caf _rest; do
   [ "$st" = OK ] && continue
   [ "$st" = PARTIAL ] && [ "${WC_RETRY_PARTIAL:-0}" != 1 ] && continue
   lim=$(cur_maxpar); [ "$lim" != "$last" ] && { echo "$(/bin/date '+%F %T') concurrency limit $lim" >> "$LOG"; last=$lim; }
-  while [ $nrun -ge "$lim" ]; do wait -n; nrun=$((nrun-1)); lim=$(cur_maxpar); done
-  while [ "$(ourmem_gb)" -ge "$WC_MEM_GUARD_GB" ] || [ "$(sys_avail_gb)" -lt "$WC_SYS_MIN_AVAIL_GB" ]; do /usr/bin/sleep 30; done
+  if [ "${WC_GLOBAL:-0}" = 1 ]; then
+    while [ "$(running_global)" -ge "$lim" ]; do /usr/bin/sleep 15; lim=$(cur_maxpar); done
+  else
+    while [ $nrun -ge "$lim" ]; do wait -n; nrun=$((nrun-1)); lim=$(cur_maxpar); done
+  fi
+  while [ "$(ourmem_gb)" -ge "$(cur_memguard)" ] || [ "$(sys_avail_gb)" -lt "$WC_SYS_MIN_AVAIL_GB" ]; do /usr/bin/sleep 30; done
   if [ "${WC_KRB_WAIT:-0}" = 1 ] && ! /usr/bin/klist -s 2>/dev/null; then
     echo "$(/bin/date '+%F %T') no valid Kerberos ticket -- waiting (kinit to resume)" >> "$LOG"
     until /usr/bin/klist -s 2>/dev/null; do /usr/bin/sleep 60; done

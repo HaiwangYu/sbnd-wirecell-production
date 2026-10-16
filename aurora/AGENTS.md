@@ -8,7 +8,7 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 
 1. **Never commit or push on your own** to the toolkit, larwirecell or wcp-porting-validation. Leave changes for the owner, Haiwang. Pushing to this repo and to the ai-helper repo is fine when asked.
 2. **Everything builds and runs inside the SL7 container**: `env/fnal/` or `env/aurora/`, through the site's `WC_WRAP`. A host build links the wrong glibc and fails only at plugin load.
-3. **Shared machines (FNAL sbndbuild03):** never more than half the machine, and half again in the day (08:00–20:00). `site/fnal-sbndbuild03.sh` encodes this: cores 32–63, 14 pairs in the day and 28 at night, a 50 GB RSS guard, a 15 GB machine-available guard. Do not raise these without the owner. The one exception the owner approved (2026-10-10) is `site/fnal-sbndbuild03-60pct.sh`, for the open FixedDev BNB data run.
+3. **Shared machines (FNAL sbndbuild03):** never more than half the machine, and half again in the day (08:00–20:00). `site/fnal-sbndbuild03.sh` encodes this: cores 32–63, 14 pairs in the day and 28 at night, a 50 GB RSS guard, a 15 GB machine-available guard. Do not raise these without the owner. The exceptions the owner approved: `site/fnal-sbndbuild03-60pct.sh` (2026-10-10, the open FixedDev BNB data run) and `site/fnal-sbndbuild03-governed.sh` with `bin/load-governor.sh` (2026-10-15, ai-helper #42): 60 % while the other users take < 20 % of CPU and memory, else 30 %.
 4. **Never edit anything under `sbnd_xin/`** (Xin's area): read and run only.
 5. **Blinded data:** the SBND2026A `gen2_BNB-Run1` set is blinded. Never use it.
 6. **Ask the owner** when a choice changes what gets produced.

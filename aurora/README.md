@@ -37,7 +37,10 @@ bin/run-pairs.sh site/<site>.sh pairs.tsv <workdir>
 cat <workdir>/pool.log <workdir>/cost-summary.md
 ```
 - Sites: `site/fnal-sbndbuild03.sh` (FNAL, SL7 via `in-gpvm-sl7.sh`) and `site/aurora.sh` (ALCF Aurora compute node; `pbs/run-pairs.pbs`).
-- Disk: `WC_KEEP=minimal bin/run-pairs.sh …` keeps only `ql/<tag>/qlpctree.tar.gz`, `merged/` and the logs of each validated pair (the FrameShift copy, `mabc.zip`, `nugraph.h5`, `pr_evt*/`, `mabc-pr.zip` are deleted); the default `all` keeps everything. A `FAIL` pair always keeps everything.
+- Keep modes (`WC_KEEP`): `all` (default), `minimal` (qlpctree + merged CAF + logs), `semiprod` (+ every `tracking-pr.root`), `validation` (+ the Bee zips). Details in `bin/run_pair.py`.
+- Pairs: `find-pairs.py --reco1-names <file>` pairs a given list of reco1 files through SAM; `--caf-relation sibling` pairs data whose CAF was made from the raw file in one job (MCP2025C, gen2 InTime): reco1 and CAF are children of one raw file. Skipped reco1 files go to `<pairs>.skipped`.
+- Shared node, load-governed: `site/fnal-sbndbuild03-governed.sh` + `bin/load-governor.sh <control dir>`. The governor sets the budget every minute from the other users' load: 60 % of CPU and memory while they use < 20 % of both, 30 % otherwise. All pools sharing the control dir count against one budget (`WC_GLOBAL=1`).
+- Disk (#40): `WC_KEEP=minimal bin/run-pairs.sh …` keeps only `ql/<tag>/qlpctree.tar.gz`, `merged/` and the logs of each validated pair (the FrameShift copy, `mabc.zip`, `nugraph.h5`, `pr_evt*/`, `mabc-pr.zip` are deleted); the default `all` keeps everything. A `FAIL` pair always keeps everything.
 - `site/fnal-sbndbuild03-60pct.sh`: 60 % of sbndbuild03 (cores 26–63, 38 pairs at night and on weekends, 19 in the weekday daytime, 70 GB guard), owner-approved for the open-data run only.
 - Rerunning `run-pairs.sh` on the same work dir resumes: pairs with `status` `OK` or `PARTIAL` are skipped, and a `FAIL` pair reuses its finished step-1 slices and step-2 tars.
 

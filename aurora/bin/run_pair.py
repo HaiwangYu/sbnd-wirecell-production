@@ -26,12 +26,16 @@ Exception handling (ai-helper issue 39 log (c)):
              FAIL <stage> <why>.
   attempts   every failed try is moved to <id>/attempts/<step>-<tag>-try<k>/ and kept.
 Resume: a rerun reuses every step-1 slice / step-2 tar that has a DONE marker.
-Keep (WC_KEEP): "all" (default) keeps everything; "minimal" deletes the large intermediates once
-  the pair is merged and validated (OK or PARTIAL): the FrameShift copy (already after step 1),
-  every *.root / *.zip / *.h5 and pr_evt*/ under ql/, pr/ and attempts/, and failed tries'
-  qlpctree.tar.gz.  Kept: ql/<tag>/qlpctree.tar.gz, merged/, and the logs.  The pr/<tag>/DONE
-  markers go too, so a rerun (WC_RETRY_PARTIAL=1) redoes step 2 from the kept tars.  A FAIL pair
-  keeps everything for debugging.
+Keep (WC_KEEP), applied once the pair is merged and validated (OK or PARTIAL); a FAIL pair keeps
+  everything for debugging.  The FrameShift copy goes right after step 1 in every mode but "all".
+    all         keep everything (default)
+    minimal     ql/<tag>/qlpctree.tar.gz, merged/, logs; everything else (*.root, *.zip, *.h5,
+                pr_evt*/) goes, and so do the pr/<tag>/DONE markers, so a rerun
+                (WC_RETRY_PARTIAL=1) redoes step 2 from the kept tars
+    validation  as minimal, plus every pr_evt*/tracking-pr.root and the Bee zips
+                (ql/<tag>/mabc.zip, pr/<tag>/mabc-pr.zip)
+    semiprod    as minimal, plus every pr_evt*/tracking-pr.root (no Bee)
+  Failed tries under attempts/ keep only their logs (all but "all").
 
 Layout <workdir>/<id>/: fs/ (step 0, data), ql/<tag>/ (step 1, tag "all" or "s<a>-<b>"), pr/<tag>/ (step 2),
 attempts/, merged/, good.txt, events.json, validate.json, cost.tsv, status.
@@ -62,8 +66,8 @@ ATTEMPTS2 = int(E.get('WC_STEP2_ATTEMPTS', 2))
 T0 = int(E.get('WC_TIMEOUT_STEP0', 1800))
 FRAMESHIFT = E.get('WC_FRAMESHIFT', '1' if REAL == 'data' else '0') == '1'
 KEEP = E.get('WC_KEEP', 'all')
-if KEEP not in ('all', 'minimal'):
-    sys.exit('run_pair.py: WC_KEEP must be all or minimal')
+if KEEP not in ('all', 'minimal', 'validation', 'semiprod'):
+    sys.exit('run_pair.py: WC_KEEP must be all, minimal, validation or semiprod')
 COST = os.path.join(D, 'cost.tsv')
 
 
@@ -244,7 +248,7 @@ while slices:
 
 if not tars:
     finish('FAIL step1 no step-1 output', skipped=skipped, lost_slices=lost)
-if KEEP == 'minimal' and os.path.isdir(FSDIR):
+if KEEP != 'all' and os.path.isdir(FSDIR):
     for f in glob.glob(os.path.join(FSDIR, '*.root*')):
         os.remove(f)
 
@@ -307,9 +311,11 @@ if E.get('WC_VALIDATE', '1') == '1':
         finish('FAIL validate rc %d' % rc, skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
 
 
-def cleanup_minimal():
-    """WC_KEEP=minimal: keep qlpctree.tar.gz (final slices), merged/ and the logs; delete the rest."""
+def cleanup(keep_mode):
+    """WC_KEEP != all: delete the large files the mode does not keep (see the docstring)."""
     n, mb = 0, 0.0
+    keep_pr = keep_mode in ('validation', 'semiprod')     # pr_evt*/tracking-pr.root (+ DONE)
+    keep_bee = keep_mode == 'validation'                  # mabc.zip, mabc-pr.zip
 
     def rm(p):
         nonlocal n, mb
@@ -322,20 +328,25 @@ def cleanup_minimal():
     for qd in glob.glob(os.path.join(D, 'ql', '*')) + glob.glob(os.path.join(D, 'attempts', 'step1-*')):
         final = os.path.dirname(qd) == os.path.join(D, 'ql')
         for f in os.listdir(qd):
-            if f.endswith(big) and not (final and f == 'qlpctree.tar.gz'):
+            if f.endswith(big) and not (final and (f == 'qlpctree.tar.gz' or (keep_bee and f == 'mabc.zip'))):
                 rm(os.path.join(qd, f))
     for pd in glob.glob(os.path.join(D, 'pr', '*')) + glob.glob(os.path.join(D, 'attempts', 'step2-*')):
+        final = os.path.dirname(pd) == os.path.join(D, 'pr')
         for f in os.listdir(pd):
+            if final and keep_pr and (f.startswith('pr_evt') or f == 'DONE'):
+                continue
+            if final and keep_bee and f == 'mabc-pr.zip':
+                continue
             if f.startswith('pr_evt') or f.endswith(big) or f == 'DONE':
                 rm(os.path.join(pd, f))
     left = [(du_mb(os.path.join(dp, f)), os.path.join(dp, f)) for dp, _, fs in os.walk(D) for f in fs
             if not dp.startswith(mdir) and f != 'qlpctree.tar.gz']
-    left = [x for x in left if x[0] > 5]
-    log('keep=minimal: removed %d files/dirs, %.1f MB%s' % (n, mb, ('; still > 5 MB: %s' % left) if left else ''))
+    left = [x for x in left if x[0] > 5 and not (keep_pr and '/pr_evt' in x[1]) and not (keep_bee and x[1].endswith('.zip'))]
+    log('keep=%s: removed %d files/dirs, %.1f MB%s' % (keep_mode, n, mb, ('; still > 5 MB: %s' % left) if left else ''))
 
 
-if KEEP == 'minimal':
-    cleanup_minimal()
+if KEEP != 'all':
+    cleanup(KEEP)
 mj = json.load(open(os.path.join(mdir, 'merge.json')))
 missing = mj['n_caf_events_without_wirecell']
 info = dict(skipped=skipped, lost_slices=lost, step2_failed=step2_failed, caf_events=mj['n_caf_events'],
