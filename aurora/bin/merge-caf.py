@@ -36,6 +36,7 @@ ap.add_argument('--caf', required=True)
 ap.add_argument('--out', required=True)
 ap.add_argument('--schema', required=True)
 ap.add_argument('--summary', default=None)
+ap.add_argument('--caf-name', default=None, help='the CAF to record in the provenance when --caf is a local copy')
 ap.add_argument('files', nargs='+', help='tracking-pr.root files, or @file with one path per line')
 a = ap.parse_args()
 
@@ -147,7 +148,7 @@ for i, rse in enumerate(caf_rse):
 f.cd()   # opening the per-event files moved gDirectory
 f.WriteTObject(out)
 md5 = hashlib.md5(open(a.schema, 'rb').read()).hexdigest()
-info = {'caf': os.path.abspath(a.caf), 'schema': os.path.abspath(a.schema), 'schema_md5': md5,
+info = {'caf': a.caf_name or os.path.abspath(a.caf), 'schema': os.path.abspath(a.schema), 'schema_md5': md5,
         'n_caf_events': len(caf_rse), 'n_wirecell_events': n_valid,
         'n_caf_events_without_wirecell': len(caf_rse) - n_valid,
         'n_wirecell_events_not_in_caf': len(set(wc) - set(caf_rse)),

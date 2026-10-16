@@ -66,6 +66,13 @@ ATTEMPTS2 = int(E.get('WC_STEP2_ATTEMPTS', 2))
 T0 = int(E.get('WC_TIMEOUT_STEP0', 1800))
 FRAMESHIFT = E.get('WC_FRAMESHIFT', '1' if REAL == 'data' else '0') == '1'
 KEEP = E.get('WC_KEEP', 'all')
+# Provenance (sbnd-wirecell-production #1): the files this pair stands for, when RECO1/CAF are
+# local copies (a grid job's scratch copies).  WC_STAMP_INPUT_FILE=1 makes step 1 record
+# WC_RECO1_ORIG (default RECO1) as the event's input_file (larwirecell WCLS_INPUT_FILE) -- also the
+# fix for data, whose step 1 reads the FrameShift copy.  Default off: unchanged.
+RECO1_ORIG = E.get('WC_RECO1_ORIG', RECO1)
+CAF_ORIG = E.get('WC_CAF_ORIG', CAF)
+STAMP = E.get('WC_STAMP_INPUT_FILE', '0') == '1'
 if KEEP not in ('all', 'minimal', 'validation', 'semiprod'):
     sys.exit('run_pair.py: WC_KEEP must be all, minimal, validation or semiprod')
 COST = os.path.join(D, 'cost.tsv')
@@ -127,6 +134,8 @@ def container(name, cmd, timeout_s, cwd=None):
         inner += ['taskset', '-c', CPUSET]
     inner += ['/usr/bin/timeout', '-k', '60', str(timeout_s)] + cmd
     env = dict(os.environ, SL7_SETUP=SETUP)
+    if STAMP:
+        env['WCLS_INPUT_FILE'] = RECO1_ORIG
     with open(os.path.join(D, 'cost', name + '.out'), 'w') as out:
         rc = subprocess.call([WRAP] + inner, stdout=out, stderr=subprocess.STDOUT, env=env, cwd=cwd or D)
     return rc, timefile
@@ -299,7 +308,8 @@ mdir = os.path.join(D, 'merged')
 os.makedirs(mdir, exist_ok=True)
 merged = os.path.join(mdir, out_name)
 rc, tf = container('step3', ['python3', os.path.join(BIN, 'merge-caf.py'), '--caf', CAF, '--out', merged,
-                             '--schema', SCHEMA, '--summary', os.path.join(mdir, 'merge.json'), '@' + good], T3)
+                             '--schema', SCHEMA, '--summary', os.path.join(mdir, 'merge.json')]
+                   + (['--caf-name', CAF_ORIG] if CAF_ORIG != CAF else []) + ['@' + good], T3)
 cost_row('step3', 'all', 1, rc, tf, merged)
 if rc != 0:
     finish('FAIL step3 merge rc %d' % rc, skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
