@@ -22,6 +22,7 @@ import os
 import random
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--reco1-def', required=True)
@@ -95,38 +96,44 @@ random.Random(a.seed).shuffle(rest)
 order = first + rest
 print('order: %d included first, then %d shuffled (seed %d)' % (len(first), len(rest), a.seed), flush=True)
 
+def check(n, m):
+    """-> (pair or None, reason): the CAF and the dCache checks for one reco1 (run in threads)."""
+    if not m:
+        return None, 'no metadata'
+    nev = m.get('sbn_dm.event_count') or m.get('event_count')
+    r1 = os.path.join(reco1[n], n)
+    if a.relation == 'name':
+        caf = os.path.join(reco1[n].replace('/reco1/', '/caf/'), 'reco2-%s.flat.caf.root' % n[:-len('.root')])
+        if not os.path.exists(caf):
+            return None, 'no CAF ' + caf
+    else:
+        par = [p['file_name'] if isinstance(p, dict) else p for p in m.get('parents', [])]
+        stems = [p[:-len('.root')] for p in par if p.endswith('.root')]
+        cands = [c for s in stems for c in caf_by_raw.get(s, [])]
+        if len(par) != 1 or len(cands) != 1:
+            return None, '%d parents, %d sibling CAFs' % (len(par), len(cands))
+        caf = cands[0]
+    if not online(r1) or not online(caf):
+        return None, 'not ONLINE'
+    return (n[:-len('.root')], r1, caf, int(nev) if nev else '-'), ''
+
+
+# the per-file NFS checks (exists, dCache locality) dominate: 32 threads; metadata in batches of 400
+pool = ThreadPoolExecutor(32)
 pairs, skipped, total, k = [], [], 0, 0
 while total < a.target_events and k < len(order):
     batch = order[k:k + 400]
     k += len(batch)
     md = metadata(batch)
-    for n in batch:
+    results = list(pool.map(lambda n: check(n, md.get(n)), batch))
+    for n, (pair, why) in zip(batch, results):
         if total >= a.target_events:
             break
-        m = md.get(n)
-        if not m:
-            skipped.append((n, 'no metadata'))
+        if pair is None:
+            skipped.append((n, why))
             continue
-        nev = m.get('sbn_dm.event_count') or m.get('event_count')
-        r1 = os.path.join(reco1[n], n)
-        if a.relation == 'name':
-            caf = os.path.join(reco1[n].replace('/reco1/', '/caf/'), 'reco2-%s.flat.caf.root' % n[:-len('.root')])
-            if not os.path.exists(caf):
-                skipped.append((n, 'no CAF ' + caf))
-                continue
-        else:
-            par = [p['file_name'] if isinstance(p, dict) else p for p in m.get('parents', [])]
-            stems = [p[:-len('.root')] for p in par if p.endswith('.root')]
-            cands = [c for s in stems for c in caf_by_raw.get(s, [])]
-            if len(par) != 1 or len(cands) != 1:
-                skipped.append((n, '%d parents, %d sibling CAFs' % (len(par), len(cands))))
-                continue
-            caf = cands[0]
-        if not online(r1) or not online(caf):
-            skipped.append((n, 'not ONLINE'))
-            continue
-        pairs.append((n[:-len('.root')], r1, caf, int(nev) if nev else '-'))
-        total += int(nev or 0)
+        pairs.append(pair)
+        total += pair[3] if isinstance(pair[3], int) else 0
     print('  %d / %d reco1 looked at: %d pairs, %d events, %d skipped' % (k, len(order), len(pairs), total, len(skipped)), flush=True)
 
 with open(a.output, 'w') as f:

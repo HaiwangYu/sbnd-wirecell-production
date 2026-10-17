@@ -17,9 +17,11 @@
 # mounted /pnfs and writes the outputs under a local directory.
 set -u
 LIST=${1:?pairs list}; K=${2:?pairs per job}; SAMPLE=${3:?sample}; OUTBASE=${4:?output base}
-P=${PROCESS:-0}
+# the job's index: $PROCESS in a plain cluster; with --maxConcurrent jobsub_lite submits a DAG whose
+# nodes are separate clusters, all with PROCESS=0, and the index is $JOBSUBJOBSECTION (0-based)
+if [ -n "${DAGMANJOBID:-}" ] && [ -n "${JOBSUBJOBSECTION:-}" ]; then P=$JOBSUBJOBSECTION; else P=${PROCESS:-0}; fi
 T0=$(date +%s)
-echo "job.sh $(date '+%F %T') host $(hostname) PROCESS $P list $LIST K $K sample $SAMPLE out $OUTBASE"
+echo "job.sh $(date '+%F %T') host $(hostname) index $P (PROCESS ${PROCESS:-} JOBSUBJOBSECTION ${JOBSUBJOBSECTION:-} DAG ${DAGMANJOBID:-}) list $LIST K $K sample $SAMPLE out $OUTBASE"
 export WC_TOP=${INPUT_TAR_DIR_LOCAL:?no INPUT_TAR_DIR_LOCAL}/wc
 A=$WC_TOP/sbnd-wirecell-production/aurora
 export WC_SL7_SETUP=$WC_TOP/sbnd-wirecell-production/aurora/env/fnal/setup-fnal-run.sh
