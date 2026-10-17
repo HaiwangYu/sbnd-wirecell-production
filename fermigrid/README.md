@@ -75,6 +75,70 @@ bin/submit.sh <tarball> <pairs.tsv> <pairs per job> <sample> <campaign tag> [--d
 jobsub_q -G sbnd --user $USER
 ```
 
+## The grid test (2026-10-16): identical to r8
+
+- **Setup:** cluster `30675092@jobsub05`, 4 jobs, 2 pairs each. 7 MC CV pairs of r8 semi-production, 108 events. Tarball v2: toolkit `4b6853d4`, larwirecell `ad5d942`, workflow `dec6fb2`.
+- **Timing:** started within a minute of submission; all done in 53 min. Nodes: fnpc18001, fnpc18003, fnpc8201, fnpc17011.
+- **Result:** 7/7 pairs `OK`.
+- **`bin/compare-outputs.py` against r8, per pair:**
+  - every tree of every `tracking-pr.root` and of the merged CAF (2,070 trees, 324k branch arrays) is identical, `Trun.input_file` included;
+  - every `qlpctree` tensor (24.4k, arrays and metadata) is identical;
+  - the only difference is the `recTreeWireCell_info` note: its creation time and the schema's path (on CVMFS instead of `/exp`; same file).
+  - The CAF's `globalTree` is not readable by uproot. The merge copies it byte for byte.
+- **Grid speed:** about **2.1× the r8 local time** on the same pairs (70.4 vs 33.1 s per event). Per pair 49–98 s per event; the slowest node (fnpc8201) ran at ~98.
+- **Memory:** peak RSS ≤ 1.94 GB. Setup and copies are negligible (seconds).
+
+## Resource estimate and proposal (for review)
+
+Per event on the grid = r8 local × 2.13 (measured on MC CV; nueCC and beam-off scaled from their r8 local cost):
+
+| sample | events | r8 local s/evt | grid s/evt | events/file | files | core-hours | output (kept) |
+|---|---|---|---|---|---|---|---|
+| MC BNB CV | 500,000 | 36.7 | ~78 | 13.2 | ~37,900 (of 749k in the def) | ~10,800 | 3.26 MB/evt → ~1.6 TB |
+| MC nueCC | 100,000 | 61.3 | ~131 | 8.5 | ~11,800 (of ~13,400 with a CAF) | ~3,600 | 4.28 → ~0.43 TB |
+| beam-off (InTime) | 50,000 | 24.2 | ~52 | 47.3 | ~1,060 (of 49k) | ~720 | 2.37 → ~0.12 TB |
+| **total** | 650,000 | | | | ~50,800 | **~15,200 (+~3 % retries)** | **~2.2 TB** |
+
+- **Input read from dCache:** about 17 TB (CV 13.7, nueCC 3.2, beam-off 0.2). A random 150 files of each def were all `ONLINE`, so no prestage is expected.
+
+**Proposed job shape** (aim: 2–3 h jobs, so a lost job costs little):
+
+| sample | pairs per job | events per job | expected job time | jobs |
+|---|---|---|---|---|
+| MC CV | 8 | ~106 | ~2.3 h | ~4,740 |
+| MC nueCC | 10 | ~85 | ~3.1 h | ~1,180 |
+| beam-off | 3 | ~142 | ~2.0 h | ~354 |
+
+**Proposed resources per job:**
+
+| setting | proposal | why |
+|---|---|---|
+| `--cpu` | 1 | every step is single-threaded |
+| `--memory` | **4000MB** | median peak ~1.6 GB, but r8 has rare successful steps up to 3.0 (step 1) and 5.3 GB (one beam-off step 2), and the step-2 crash runaway reaches 4.2–4.5 GB. Plus `+FERMIHTC_AutoRelease=True; +FERMIHTC_GraceMemory=2048`: a job held for memory is released with 2 GB more, and the restart skips the pairs already copied (`job.sh`) |
+| `--disk` | 6GB | reco1 ≤ 0.5 GB + FrameShift copy (data) + one pair's work and outputs (≤ 0.3 GB) |
+| `--expected-lifetime` | 6h | 2–3 h expected; the slowest node is ~1.4× the average |
+| `usage_model` | DEDICATED,OPPORTUNISTIC | onsite first; OFFSITE (OSG) is possible later (CVMFS + xrootd/ifdh), but not tested |
+| `--maxConcurrent` | ~2,000 per sample | caps the dCache load (~17 TB read) and our share of `group_sbnd` |
+
+**Queues** (HTCondor at `gpcollector03`, 2026-10-16):
+- FermiGrid pool: 12,506 slots, 11,253 claimed.
+- `group_sbnd` quota: 8,001 (ICARUS 8,000, DUNE 6,400, uBooNE 3,400). SBND's weighted use at that moment: ~19.7k (surplus sharing).
+- Jobs run as `--role=Analysis` in `group_sbnd`.
+- Most partitionable slots are sized at ~2–2.5 GB per core, so 4 GB jobs match fewer of them than 2 GB jobs would.
+
+**Elapsed time** for ~15.7k core-hours: ~16 h at 1,000 concurrent jobs, ~8 h at 2,000, ~5 h at 3,000.
+
+**Open points for review:**
+1. **Which files.**
+   - CV: the first ~37,900 files of the def by name, or a random seeded sample; with or without r8's 990.
+   - nueCC: ~11,800 of ~13,400.
+   - beam-off: ~1,060 of 49k; with or without r8's 212.
+2. **Output on `/pnfs/sbnd/scratch`** (~2.2 TB) is not permanent: dCache scratch evicts files that are not used. Copy to persistent or tape-backed storage afterwards?
+3. **Memory:** 4000MB + auto-release (proposed), or 3000MB to match more slots and accept rare memory holds.
+4. **Concurrency cap**, and onsite only vs adding OFFSITE.
+
+Before submitting: the full pairs lists, made in bulk (`samweb list-file-locations` + batched metadata; per-file SAM calls would take ~12 h for 38k files).
+
 ## Status
 
 See issue #1.

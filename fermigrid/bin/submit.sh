@@ -13,6 +13,9 @@
 #   WC_GRID_USAGE    (DEDICATED,OPPORTUNISTIC)
 #   WC_GRID_IMAGE    the SL7 image the local productions use (fnal-dev-sl7)
 #   WC_GRID_MAXCONCURRENT      cap on running jobs of this submission (unset = none)
+#   WC_GRID_LINES    extra condor lines, ';'-separated, e.g. the FIFE auto-release after a memory hold:
+#                    '+FERMIHTC_AutoRelease=True;+FERMIHTC_GraceMemory=2048;+FERMIHTC_GraceLifetime=3600'
+#                    (a restarted job skips the pairs already at the destination, bin/job.sh)
 # Needs a valid token (jobsub_lite gets it through htgettoken; the first time interactively).
 set -euo pipefail
 TAR=$(realpath "${1:?code tarball}"); PAIRS=$(realpath "${2:?pairs.tsv}"); K=${3:?pairs per job}
@@ -28,6 +31,7 @@ cmd=(jobsub_submit -G sbnd --role=Analysis -N "$NJ"
      --singularity-image "$IMG" --append_condor_requirements="$REQ"
      --tar_file_name "dropbox://$TAR" -f "dropbox://$PAIRS" --mail_never)
 [ -n "${WC_GRID_MAXCONCURRENT:-}" ] && cmd+=(--maxConcurrent "$WC_GRID_MAXCONCURRENT")
+if [ -n "${WC_GRID_LINES:-}" ]; then IFS=';' read -ra L <<< "$WC_GRID_LINES"; for l in "${L[@]}"; do cmd+=(--lines "$l"); done; fi
 cmd+=("file://$F/bin/job.sh" "$(basename "$PAIRS")" "$K" "$SAMPLE" "$OUTBASE")
 echo "$(date '+%F %T') $N pairs, $K per job -> $NJ jobs; output $OUTBASE/$SAMPLE"
 printf '%q ' "${cmd[@]}"; echo

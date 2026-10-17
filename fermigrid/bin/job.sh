@@ -39,6 +39,13 @@ put() {    # put <local file> <dest dir>
   if [ "${WC_GRID_EMULATE:-0}" = 1 ]; then mkdir -p "$2" && cp "$1" "$2/"; else ifdh cp "$1" "$2/$(basename "$1")"; fi
 }
 mkdest() { if [ "${WC_GRID_EMULATE:-0}" = 1 ]; then mkdir -p "$1"; else ifdh mkdir_p "$1"; fi; }
+# a pair whose merged CAF and qlpctree are already at the destination is skipped, so a job that
+# is restarted (e.g. auto-released after a memory hold) does not redo the pairs it finished
+done_already() {
+  local dest=$1 ls
+  if [ "${WC_GRID_EMULATE:-0}" = 1 ]; then ls=$(ls "$dest" 2>/dev/null); else ls=$(ifdh ls "$dest" 0 2>/dev/null | xargs -n1 basename 2>/dev/null); fi
+  echo "$ls" | grep -q 'flat.caf.root$\|\.caf\.root$' && echo "$ls" | grep -q 'qlpctree.*tar.gz$'
+}
 n=0; nok=0
 grep -v '^#' "$listf" | sed -n "$((P*K+1)),$((P*K+K))p" > "$S/my-pairs.tsv"
 echo "pairs in this job: $(wc -l < "$S/my-pairs.tsv")"
@@ -46,6 +53,7 @@ while IFS=$'\t' read -r id real r1 caf nev; do
   [ -z "$id" ] && continue
   n=$((n+1)); t=$(date +%s)
   echo "=== pair $n $id ($real, $nev events) $(date '+%F %T')"
+  if done_already "$OUTBASE/$SAMPLE/$id"; then echo "  already at the destination, skipped"; nok=$((nok+1)); continue; fi
   in=$S/in; rm -rf "$in" "$S/work"; mkdir -p "$in"
   fetch "$r1" "$in" && fetch "$caf" "$in" || { echo "  FETCH FAILED"; continue; }
   WC_RECO1_ORIG=$r1 WC_CAF_ORIG=$caf python3 "$A/bin/run_pair.py" "$id" "$real" "$in/$(basename "$r1")" "$in/$(basename "$caf")" \
