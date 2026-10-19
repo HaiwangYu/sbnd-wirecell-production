@@ -100,7 +100,7 @@ On MC, step 1's labeler writes each blob's true-particle label with its purity, 
 | larwirecell | `HaiwangYu/larwirecell` branch `sbnd-wc-flatcaf` (from `189ad26`): the art input file name as set metadata `input_file`; `73c79bc`: the labeler's `truth_detail` |
 | wcp-porting-validation | `WireCell/wcp-porting-validation` `main`: the step-1 fcls |
 
-Environment: `env/fnal/` (FNAL) and `env/aurora/` (copies of ai-helper #29's Aurora scripts).
+Environment: `env/fnal/` (FNAL) and `env/aurora/` (copies of ai-helper #29's Aurora scripts). Running on Aurora: [`docs/aurora-r8-chain.md`](docs/aurora-r8-chain.md).
 
 ## Layout of a work dir
 

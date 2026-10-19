@@ -44,17 +44,13 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 
 Report the `PARTIAL` pairs with their `events.json` (skipped events, failed tars), as well as `pool.log`, `cost-summary.md` (time, CPU, RSS and disk per step, per event), and the number of pairs `OK` / `FAIL` with their failing step. Also report every `validate.json` that is not `PASS`, with its first problems, and any `pr-try1/` (crash) units. Append it to the tracking issue.
 
-## Deploying on Aurora (first time, or after a pin change)
+## Deploying on Aurora
 
-Validated on FNAL sbndbuild03 so far (ai-helper #39 log (b)). On Aurora:
-1. **Sources.** In `$Y` (`/lus/flare/projects/neutrinoGPU/yuhw`):
-   - `wire-cell-toolkit` → fork branch `sbnd-wc-flatcaf`;
-   - `larwirecell` → fork branch `sbnd-wc-flatcaf`;
-   - `wcp-porting-validation` → `main`.
-2. **Build** both with ai-helper `issues/29-aurora-production/scripts/build-wct-lwc.pbs` (a clean toolkit build, the RPATH strip, the larwirecell libs into `$OPT`). Check gates G1–G2.
-3. **Inputs.** Aurora's `Gen2_2026/` holds the CV production, with CAFs named `*.caf.root`:
-   `bin/find-pairs.py --reco1-dir $Y/Gen2_2026/reco1 --caf-dir $Y/Gen2_2026/caf --reality sim --limit 5 -o pairs.tsv`
-   (adjust the directories to the actual layout). For SAM selection, run `find-pairs.py` at FNAL and `--path-map` the `/pnfs` locations onto the Flare copies.
-4. **Smoke** (gate G4): `qsub -q debug -l walltime=00:59:00 -v REPO=$PWD,PAIRS=pairs.tsv,WORK=<dir> pbs/run-pairs.pbs`. Every pair must end `OK` with `validate.json` `PASS`.
-   - The schema is the committed `schema/recTreeWireCell.schema.json`. It must also hold on Aurora: same code, same branches.
-5. **Production:** the same with more pairs (`--offset/--limit` to slice), queue `prod`. `WC_MAXPAR` defaults to 100 pairs per 104-core node.
+Follow [`docs/aurora-r8-chain.md`](docs/aurora-r8-chain.md). It covers:
+- the r8 pins and how to build them on Aurora;
+- gate G4 against an r8 reference bundle made at FNAL;
+- pairing and sizing a new sample, and production in PBS chunks;
+- what to report;
+- the Aurora traps from ai-helper #29.
+
+The 2-step chain has not yet run on Aurora: its first run there is the G4 validation.
