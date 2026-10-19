@@ -37,7 +37,16 @@ Job 8944988 (debug, 4 min queue, 22 min wall; 04:14-04:36 UTC):
 | validate | 1.0 | 0.9 | 741 | – |
 
   r8 at FNAL: ~29-37 s per event all steps. Aurora here: 54 s wall per event per slot, 35 s CPU.
-- value-by-value comparison with r8 (`compare-outputs.py`, UAN): see the log.
+- value-by-value comparison with r8 (`compare-outputs.py` on the UAN, ~10 min per pair; `aurora-run/<id>/compare.json`):
+
+| pair | trees / branches / events | qlpctree tensors | differing branches |
+|---|---|---|---|
+| CV 0a6e (13 events) | 248 / 37,553 / 13 | 2939 = 2939, 0 array diffs, metadata = `input_file` only | `Trun.input_file` (ignored), `Trun.wct_version`, `T_dlvtx_call.payload` (2 events), `recTreeWireCell_info` |
+| nueCC 86e4 (7 events) | 146 / 33,284 / 7 | 1585 = 1585, 0 array diffs, metadata = `input_file` only | the same set: `wct_version`, `payload` (7 events), `recTreeWireCell_info` |
+
+  The payload differences: top-20 scores at the 1e-6 level (float32 across hosts); in nueCC event 12220 two voxels with score 1.0 swap rank (same voxel set). `status`, `accepted`, `rerank_row`, `dl_row`, `dl_x/y/z`, `trad_row` and every other tree are identical on all 20 events. `wct_version` is the build's `git describe` string (FNAL `sbnd-dlvtx-35-pre-master-merge-2026-09-02-424-g78f81c64`, Aurora `sbnd-wc-flatcaf-sbnd-dlvtx-35-pre-master-merge-51-g4b6853d`, the same commit). Both added to the guide's expected-differences list.
+
+**Gate G4: PASS** (2026-10-19). The aurora workflow reproduces r8.
 
 
 ## 3. The new sample (inventory 2026-10-19)
@@ -69,3 +78,4 @@ Checked: `reco1-<id>.root` ↔ parent `reco2-reco1-<id>.root` by name, 20 parent
 ## 5. Log
 
 - 2026-10-19: pins checked out, uproot installed, reference md5 OK, job 8944988 (build + G4) submitted 04:11 UTC; the sample inventoried (section 3); the 20-parents finding → question to the owner.
+- 2026-10-19 04:36 UTC: job 8944988 done, both pairs OK / PASS / dl_fail 0; compare vs r8: G4 PASS (section 2). Waiting for the owner's decision on the multi-reco1 unit before the smoke.
