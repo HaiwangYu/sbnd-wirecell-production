@@ -42,12 +42,13 @@ cat <workdir>/pool.log <workdir>/cost-summary.md
 - Shared node, load-governed: `site/fnal-sbndbuild03-governed.sh` + `bin/load-governor.sh <control dir>`. The governor sets the budget every minute from the other users' load: 60 % of CPU and memory while they use < 20 % of both, 30 % otherwise. All pools sharing the control dir count against one budget (`WC_GLOBAL=1`).
 - Disk (#40): `WC_KEEP=minimal bin/run-pairs.sh …` keeps only `ql/<tag>/qlpctree.tar.gz`, `merged/` and the logs of each validated pair (the FrameShift copy, `mabc.zip`, `nugraph.h5`, `pr_evt*/`, `mabc-pr.zip` are deleted); the default `all` keeps everything. A `FAIL` pair always keeps everything.
 - `site/fnal-sbndbuild03-60pct.sh`: 60 % of sbndbuild03 (cores 26–63, 38 pairs at night and on weekends, 19 in the weekday daytime, 70 GB guard), owner-approved for the open-data run only.
-- Rerunning `run-pairs.sh` on the same work dir resumes: pairs with `status` `OK` or `PARTIAL` are skipped, and a `FAIL` pair reuses its finished step-1 slices and step-2 tars.
+- Rerunning `run-pairs.sh` on the same work dir resumes: pairs with `status` `OK`, `PARTIAL` or `EMPTY` are skipped, and a `FAIL` pair reuses its finished step-1 slices and step-2 tars.
 
 ## When something goes wrong (`bin/run_pair.py`)
 
 | situation | what happens | `status` |
 |---|---|---|
+| the reco1 file has no events (empty `Events` tree; e.g. 38 of 1,096 gen2 InTime files in fg1, 2 of them with a non-zero SAM `event_count`) | nothing runs | `EMPTY no events in the reco1 file` |
 | data: `run_frameshift.fcl` fails, or the copy lacks FrameShift / lost events (`WC_TIMEOUT_STEP0`, 1800 s) | stops before step 1 | `FAIL step0 …` |
 | CAF or reco1 missing, empty, or on tape (dCache locality not `ONLINE`) | stops before any compute | `FAIL precheck …` |
 | step 1 (`lar`) crashes or exceeds `WC_TIMEOUT_STEP1_BASE` + `_PER_EVENT` × events (900 + 300 s) | the failing event is found from the log (the last `<OpHitSource:tpc0> run R subrun S event E` line). It is skipped, and the rest is rerun as two slices with `--nskip`/`-n`, recursively, up to `WC_STEP1_MAX_BAD` (3) skipped events per file | `PARTIAL` (skipped events in `events.json`) |

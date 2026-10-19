@@ -18,7 +18,7 @@
 # pool's, so concurrent pools share one budget.
 # No launch while our RSS > WC_MEM_GUARD_GB or the machine has < WC_SYS_MIN_AVAIL_GB available,
 # or (WC_KRB_WAIT=1, FNAL) while there is no Kerberos ticket.  Running pairs are never killed.
-# Pairs whose <id>/status is OK or PARTIAL are skipped (WC_RETRY_PARTIAL=1 reruns PARTIAL ones);
+# Pairs whose <id>/status is OK, PARTIAL or EMPTY are skipped (WC_RETRY_PARTIAL=1 reruns PARTIAL ones);
 # a FAIL pair is rerun, reusing every finished step-1 slice and step-2 tar.
 set -u
 SITE=${1:?site config}; PAIRS=${2:?pairs.tsv}; WORK=${3:?workdir}
@@ -55,7 +55,7 @@ nrun=0; last=""
 while IFS=$'\t' read -r id real r1 caf _rest; do
   [ -z "$id" ] && continue; [[ $id == \#* ]] && continue
   st=$(cat "$WORK/$id/status" 2>/dev/null)
-  [ "$st" = OK ] && continue
+  [ "$st" = OK ] && continue; [[ $st == EMPTY* ]] && continue
   [ "$st" = PARTIAL ] && [ "${WC_RETRY_PARTIAL:-0}" != 1 ] && continue
   lim=$(cur_maxpar); [ "$lim" != "$last" ] && { echo "$(/bin/date '+%F %T') concurrency limit $lim" >> "$LOG"; last=$lim; }
   if [ "${WC_GLOBAL:-0}" = 1 ]; then
@@ -75,6 +75,6 @@ while IFS=$'\t' read -r id real r1 caf _rest; do
   /usr/bin/sleep 2
 done < "$PAIRS"
 wait
-echo "$(/bin/date '+%F %T') pool done: $(cat "$WORK"/*/status 2>/dev/null | grep -cx OK) OK, $(cat "$WORK"/*/status 2>/dev/null | grep -cx PARTIAL) PARTIAL, $(cat "$WORK"/*/status 2>/dev/null | grep -c '^FAIL') FAIL" >> "$LOG"
+echo "$(/bin/date '+%F %T') pool done: $(cat "$WORK"/*/status 2>/dev/null | grep -cx OK) OK, $(cat "$WORK"/*/status 2>/dev/null | grep -cx PARTIAL) PARTIAL, $(cat "$WORK"/*/status 2>/dev/null | grep -c '^EMPTY') EMPTY, $(cat "$WORK"/*/status 2>/dev/null | grep -c '^FAIL') FAIL" >> "$LOG"
 python3 "$BIN/cost-summary.py" "$WORK" > "$WORK/cost-summary.md" 2>&1
 echo "end     $(/bin/date '+%F %T %Z')" >> "$WORK/RUN-RECORD.txt"

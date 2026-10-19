@@ -38,10 +38,13 @@ The tarball ships what a local job reads from `/exp` or `/nashome`. The list was
 
 ## A job (`bin/job.sh`)
 
-Job `$PROCESS` takes K consecutive rows of the pairs list. For each pair:
-1. `ifdh cp` the reco1 and the CAF to scratch;
+Job `$PROCESS` takes K consecutive rows of the pairs list. (In a `--maxConcurrent` DAG every node has `PROCESS=0`, and the index is `JOBSUBJOBSECTION`.) For each pair:
+0. list `<output base>/<sample>/<id>/` (`ifdh ll <dir> 1`):
+   - a **finished** pair is skipped. Finished means `<id>.done` is there; for fg1 outputs, made before the marker existed, it means the merged CAF, the qlpctree, `<id>.tracking-pr.tar` and `<id>.logs.tar.gz` are all there.
+   - if the listing fails (3 tries), the pair is skipped and nothing is run or written;
+1. `ifdh cp` the reco1 and the CAF to scratch. Each copy must have the source's size (`ifdh ll`); otherwise the copy is retried, up to 3 tries, and then the pair is `FETCH FAILED`;
 2. `run_pair.py` with `WC_KEEP=semiprod` and `WC_STAMP_INPUT_FILE=1` (the event's `input_file` and the merged CAF's provenance name the original /pnfs files, not the copies);
-3. copy to `<output base>/<sample>/<id>/`:
+3. list the destination again, then copy to `<output base>/<sample>/<id>/`. Each file must arrive with its local size (3 tries):
 
 | file | content |
 |---|---|
@@ -49,8 +52,21 @@ Job `$PROCESS` takes K consecutive rows of the pairs list. For each pair:
 | `<id>.tracking-pr.tar` | every `pr/all/pr_evt<E>/tracking-pr.root` of the pair, paths kept (one file per pair instead of one per event, for dCache) |
 | `<merged CAF>.wc.flat.caf.root` | the flat CAF with `recTreeWireCell` |
 | `<id>.logs.tar.gz` | `status`, `run_pair.log`, `events.json`, `validate.json`, `merge.json`, `cost.tsv`, every lar / wire-cell log |
+| `<id>.done` | written last, only for an `OK`, `PARTIAL` or `EMPTY` pair whose files all arrived: the status, the job, and each file with its size |
 
-The FrameShift copy and Bee are not kept. The job exits non-zero unless every pair is `OK` or `PARTIAL`.
+**Nothing at the destination is overwritten:**
+- `ifdh cp` refuses to overwrite a dCache file anyway (gfal: "exists and overwrite is not set").
+- The logs of a later try go to `<id>.logs.try<k>.tar.gz`.
+- A data file left by an interrupted try of an unfinished pair is kept if its size matches, and replaced otherwise.
+- If the pair became finished while the job ran, only the logs are written.
+
+**An empty reco1 file** (0 entries in `Events`) gives `EMPTY no events in the reco1 file`; nothing runs and only the logs and `<id>.done` are written. fg1 had 38 such gen2 InTime files and 4 nueCC ones; 2 of the InTime files carry a non-zero SAM `event_count`.
+
+The FrameShift copy and Bee are not kept. The job exits non-zero unless every pair is finished.
+
+**Why (fg1, issue #1):**
+- `job.sh` listed the destination with `ifdh ls <dir> 0`, which prints only the directory itself, so a restarted job could not see a finished pair: it would run the pair again, and its copies would fail as "exists".
+- In 3 pairs (2 CV, 1 nueCC), the first try saw 0 events, most likely a truncated input copy: the source files hold 12, 12 and 14 events. A later try produced the outputs, but its logs could not replace the first try's. Their `logs.tar.gz` is the failed first try; the data files are good.
 
 ## Before the grid: emulate a worker (`bin/emulate-worker.sh`)
 

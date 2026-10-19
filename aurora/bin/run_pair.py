@@ -23,6 +23,7 @@ Exception handling (ai-helper issue 39 log (c)):
   status     OK       every CAF event has Wire-Cell output, nothing failed;
              PARTIAL  merged and validated, but some events have no Wire-Cell output
                       (skipped in step 1, or step 2 never completed them) -- see events.json;
+             EMPTY    the reco1 file has no events (its Events tree is empty): nothing to run;
              FAIL <stage> <why>.
   attempts   every failed try is moved to <id>/attempts/<step>-<tag>-try<k>/ and kept.
 Resume: a rerun reuses every step-1 slice / step-2 tar that has a DONE marker.
@@ -90,7 +91,7 @@ def finish(status, **extra):
         with open(os.path.join(D, 'events.json'), 'w') as f:
             json.dump(extra, f, indent=1)
     log('status: ' + status)
-    sys.exit(0 if status in ('OK', 'PARTIAL') else 1)
+    sys.exit(0 if status.split()[0] in ('OK', 'PARTIAL', 'EMPTY') else 1)
 
 
 def du_mb(path):
@@ -198,6 +199,8 @@ if not os.path.exists(nfile):
         finish('FAIL precheck cannot count the events of the reco1 file (rc %d)' % rc)
     open(nfile, 'w').write('%d\n' % n)
 NEV = int(open(nfile).read())
+if NEV == 0:
+    finish('EMPTY no events in the reco1 file', reco1_events=0)
 
 OPHIT = re.compile(r'<OpHitSource:tpc0> run (\d+) subrun (\d+) event (\d+)')
 
