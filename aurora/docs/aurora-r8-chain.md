@@ -9,6 +9,23 @@ Read first: [`../README.md`](../README.md) (the steps), [`../AGENTS.md`](../AGEN
 
 The 2-step chain (r8) has **not yet run on Aurora**. Its first run there is a validation (section 4), not a production.
 
+**The owner's decisions (2026-10-18):**
+- The new simulation **has flat CAFs**: run the full chain, steps 1–3 and the validation.
+- Keep mode: **`semiprod`**.
+
+**State of Aurora on 2026-10-18** (checked from FNAL over ssh, `aurora-uan-0009`):
+
+| item | state | to do |
+|---|---|---|
+| `$Y/sbnd-wirecell-production` | cloned 2026-10-18 (`https://github.com/HaiwangYu/sbnd-wirecell-production`, public), `main` `41bc27e` | `git pull` |
+| `$Y/production-prep/aurora-r8-reference/` | the r8 reference bundle, rsynced 2026-10-18, `md5sum -c md5sums.txt` all OK | none: section 4 |
+| `$Y/wire-cell-toolkit` | `master` `b7bd2a1a`, clean; remotes `origin` = WireCell (https), `fork` = HaiwangYu (ssh; GitHub ssh works from the UAN) | check out `sbnd-wc-flatcaf` (`4b6853d4`) |
+| `$Y/larwirecell` and the MRB clone `$Y/larsoft-wct/v10_14_02/srcs/larwirecell` | `dev-v10_14_02_02` `189ad26`, clean; `origin` = HaiwangYu (ssh) | both to `sbnd-wc-flatcaf` (`ad5d942`) |
+| `$Y/wcp-porting-validation` | `main` `9226db9f`, clean | `git pull` |
+| `$Y/wire-cell-data` | `74ff57a` (the Eagle copy) + the untracked `XGB_nue_seed2_0923.xml` | none: the 27 files r8 reads (`sbnd/`, `sbnd*.json*`, the BDT/XGB weights, the SCN model) are md5-identical to FNAL's |
+| `$Y/opt` | the 1-step build (`polaris-build-fixes` `9195180d`); a copy is kept as `$Y/opt-9195180d-20260916` | rebuild, `CLEAN=1` (section 3) |
+| Flare | **98 % full, 83 TB free** | size the output first (section 5) |
+
 ## 1. What "the r8 chain" is
 
 Per reco1 / flat-CAF pair (`bin/run_pair.py`):
@@ -35,7 +52,7 @@ Per reco1 / flat-CAF pair (`bin/run_pair.py`):
 - `semiprod`: per pair `ql/<tag>/qlpctree.tar.gz`, every `pr/<tag>/pr_evt<E>/tracking-pr.root`, `merged/<caf>.wc.flat.caf.root`, and the logs.
 - `validation`: the same plus the Bee zips. r8 ran ~100 events per sample this way.
 
-Ask the owner which mode to use for the new sample (rule 6) if the request does not say.
+For the new sample the owner chose `semiprod`.
 
 ## 2. Aurora facts that bite (from #29)
 
@@ -58,7 +75,7 @@ Ask the owner which mode to use for the new sample (rule 6) if the request does 
   - production: `-A neutrinoGPU -q prod`;
   - short tests: `-A neutrinoGPU::debug2 -q debug -l walltime=00:59:00`, as #29 used;
   - `qstat -Qf` lists the others (`debug-scaling` 1–256 nodes, `capacity` 1–16 nodes).
-- **The project's Flare quota was at 95 % in September** (3.045 / 3.2 PB). Check `df`/quota before writing TBs: r8 `semiprod` keeps ~3.5 MB per event, and `validation` adds ~2 MB per event of Bee.
+- **Flare is nearly full:** 95 % of the project's 3.2 PB in September, 98 % of the file system (83 TB free) on 2026-10-18. Check `df`/quota before writing TBs: r8 `semiprod` keeps ~3.5 MB per event, and `validation` adds ~2 MB per event of Bee.
 - **SL7 git is 1.8:** no `git -C`. Run git on the UAN, or `cd` first.
 
 ## 3. Bring Aurora to the r8 pins
@@ -66,7 +83,7 @@ Ask the owner which mode to use for the new sample (rule 6) if the request does 
 On a UAN:
 ```bash
 Y=/lus/flare/projects/neutrinoGPU/yuhw
-cd $Y/wire-cell-toolkit && git fetch fork && git checkout sbnd-wc-flatcaf && git reset --hard fork/sbnd-wc-flatcaf   # only if the tree is clean: check git status first
+cd $Y/wire-cell-toolkit && git status --short && git fetch fork && git checkout -b sbnd-wc-flatcaf fork/sbnd-wc-flatcaf   # tree clean on 2026-10-18; if the branch exists: git checkout sbnd-wc-flatcaf && git merge --ff-only fork/sbnd-wc-flatcaf
 git log -1 --format=%h          # must be 4b6853d4 (or a later head the owner names)
 git status --short cfg          # must be empty: cfg/ is read live by every job
 cd $Y/larwirecell && git fetch && git checkout sbnd-wc-flatcaf && git pull --ff-only   # head ad5d942 (or 73c79bc)
@@ -104,7 +121,7 @@ A reference bundle was made at FNAL for this (2026-10-18): `/exp/sbnd/data/users
 - 2 r8 validation MC pairs: CV `reco1-detsim-g4-gen-Gen2_2026-0a6e-4cdb-c277-9be4` (13 events) and nueCC `reco1-detsim-g4-filter-gen-86e4-db18-f201-d962_nuecc` (7 events);
 - their inputs, r8's outputs in the layout `fermigrid/bin/compare-outputs.py` reads, `pairs-template.tsv`, `md5sums.txt`, and a README.
 
-Transfer it to `$Y/production-prep/aurora-r8-reference/` (Globus, as #29 did for its references; ask the owner if no endpoint is at hand), then `md5sum -c md5sums.txt`.
+It is already at `$Y/production-prep/aurora-r8-reference/` (rsync from FNAL, 2026-10-18; `md5sum -c md5sums.txt` passed).
 
 ```bash
 R=$Y/production-prep/aurora-r8-reference; cd $R
@@ -163,7 +180,9 @@ Record the gate's timing: `cost-summary.md`, seconds per event per step. The 2-s
    - Where are the reco1 files? Are there flat CAFs made from them (`reco2-<reco1 stem>.flat.caf.root` or `*.caf.root`)?
    - Which sbndcode made them, and how many files and events are there?
 2. **Products.** Step 1 reads, among others, `simtpc2d:dnnsp` wires (+ badmasks, wienersummary), `opflashtpc0/1`, `ionandscint:priorSCE` SimEnergyDeposits, MCTruth and MCParticle. In a job, compare the product list of one new file with the reference reco1 (`lar -c eventdump.fcl -s <file> -n 1`, both files). A missing or renamed label means the chain does not apply as is: ask the owner.
-3. **No CAF?** `run_pair.py` needs one (precheck `FAIL precheck`, and step 3 merges into it). Steps 1–2 alone can run with `bin/step1.sh` / `bin/step2.sh` through `$WC_WRAP`, but that is not r8: ask the owner before choosing this.
+3. **CAFs:** the owner says the new sample has them.
+   - Still check the CAF names against `find-pairs.py`'s rule (`reco2-<reco1 stem>.flat.caf.root` or `.caf.root`).
+   - A reco1 without a CAF cannot run (`run_pair.py` precheck). It lands in `pairs.tsv.skipped`, and the count goes in the report.
 4. **Pairs list:**
    ```bash
    bin/find-pairs.py --reco1-dir <reco1 tree> --caf-dir <caf tree> --reality sim -o pairs.tsv
