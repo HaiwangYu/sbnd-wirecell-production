@@ -146,9 +146,11 @@ for id in $(awk 'NR>1 {print $1}' $R/pairs.tsv); do
 done
 ```
 
-**Expected differences, and only these:**
+**Expected differences, and only these** (the first two from the FNAL bundle; the last two seen on the first Aurora run, 2026-10-19, job 8944988):
 - `Trun.input_file` / `wc.Trun.input_file`: the reco1 path, a `/pnfs` path in the reference;
-- `merged CAF: recTreeWireCell_info (TNamed)`: creation time and schema path.
+- `merged CAF: recTreeWireCell_info (TNamed)`: creation time and schema path;
+- `Trun.wct_version` / `wc.Trun.wct_version`: the build's `git describe --tags` string, which depends on the tags of the checkout (`sbnd-dlvtx-35-pre-master-merge-2026-09-02-424-g78f81c64` at FNAL vs `sbnd-wc-flatcaf-sbnd-dlvtx-35-pre-master-merge-51-g4b6853d` on Aurora; the same commit `4b6853d4`);
+- `T_dlvtx_call.payload` / `wc.T_dlvtx_call.payload`: the DL-vertex network's top-20 scores differ at the 1e-6 level between hosts (float32), and two voxels with equal score can swap rank (nueCC event 12220: same voxel set, decisions identical). Check that `accepted`, `dl_row`, `rerank_row`, `dl_x/y/z` and every other tree are identical; they were on all 20 events. This is the "DL/SCN vertex: not bit-stable" row of section 8, now with its size.
 
 The qlpctree tensors must be identical (`array_diffs` 0). Their metadata may differ by the input-file name only.
 
