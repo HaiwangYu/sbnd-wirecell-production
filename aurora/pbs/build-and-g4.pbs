@@ -1,0 +1,39 @@
+#!/bin/bash
+#PBS -N wc-build-g4
+#PBS -A neutrinoGPU::debug2
+#PBS -q debug
+#PBS -l select=1
+#PBS -l walltime=00:59:00
+#PBS -l filesystems=flare:home
+#PBS -j oe
+#PBS -o /lus/flare/projects/neutrinoGPU/yuhw/aurora-build-logs/build-and-g4.out
+# docs/aurora-r8-chain.md sections 3-4 in ONE debug job (Aurora allows one queued job per user):
+#   1. clean build of the checked-out toolkit + larwirecell into $OPT (ai-helper #29 build-wct-lwc.pbs);
+#   2. gates G1 (pins) and G2 (the binary knows the new code);
+#   3. gate G4: the r8 reference pairs through the workflow, WC_KEEP=validation.
+#   qsub -v "REPO=<.../aurora>,PAIRS=<pairs.tsv>,WORK=<workdir>[,SKIP_BUILD=1]" pbs/build-and-g4.pbs
+set -u
+Y=/lus/flare/projects/neutrinoGPU/yuhw; export Y; OPT=$Y/opt
+REPO=${REPO:?}; PAIRS=${PAIRS:?}; WORK=${WORK:?}
+S29=$Y/wire-cell-toolkit-ai-helper/issues/29-aurora-production/scripts
+echo "=== G1 $(date): pins"
+echo "toolkit    $(git -C $Y/wire-cell-toolkit branch --show-current) $(git -C $Y/wire-cell-toolkit log -1 --format=%h)  cfg dirty: $(git -C $Y/wire-cell-toolkit status --short cfg | wc -l)"
+echo "larwirecell $(git -C $Y/larwirecell branch --show-current) $(git -C $Y/larwirecell log -1 --format=%h); mrb clone $(git -C $Y/larsoft-wct/v10_14_02/srcs/larwirecell branch --show-current) $(git -C $Y/larsoft-wct/v10_14_02/srcs/larwirecell log -1 --format=%h)"
+echo "workflow   $(git -C $REPO/.. log -1 --format=%h)  wcp $(git -C $Y/wcp-porting-validation log -1 --format=%h)"
+if [ "${SKIP_BUILD:-0}" != 1 ]; then
+  echo "=== BUILD $(date): CLEAN=1"
+  CLEAN=1 STAGES="wct lwc" DO_CFG_GATE=0 bash $S29/build-wct-lwc.pbs 2>&1 | grep -E "^===|WCB_RC|MRB_RC|nlibs|ldd_not_found|rpath_stripped|tree_wirecell_refs|larwirecell src|FAILED|STAGE_DONE|^real"
+  grep -q WCT_STAGE_DONE $Y/aurora-build-logs/wct-stage-${PBS_JOBID%%.*}.log || { echo "toolkit build failed, stopping"; exit 1; }
+  echo "$(git -C $Y/wire-cell-toolkit log -1 --format=%h) toolkit, $(git -C $Y/larwirecell log -1 --format=%h) larwirecell, built $(date)" > $Y/aurora-build-logs/opt-build-pins.txt
+fi
+echo "=== G2 $(date): the binary knows the new code (want >= 1 each)"
+L=$OPT/larwirecell/v10_01_28/slf7.x86_64.e26.prof/lib
+echo "make_RootFlatTreeVisitor_factory $(nm -D --defined-only $OPT/lib/libWireCellRoot.so | grep -c make_RootFlatTreeVisitor_factory)"
+echo "T_overlap $(strings $OPT/lib/libWireCellRoot.so | grep -c '^T_overlap$')"
+echo "respond_to_open_input_file $(nm -DC $L/libWireCellLarsoft.so | grep -c respond_to_open_input_file)"
+echo "prong_trackid $(strings $L/libWireCellAIML.so | grep -c prong_trackid)"
+echo "=== G4 $(date): the r8 reference pairs, WC_KEEP=validation"
+cd "$REPO"; export WC_KEEP=validation
+bash bin/run-pairs.sh site/aurora.sh "$PAIRS" "$WORK"
+echo "=== $(date) done"; cat "$WORK/pool.log" | tail -5; cat "$WORK/cost-summary.md"; for d in "$WORK"/*/; do [ -f "$d/status" ] && echo "$(basename $d): $(cat $d/status) validate=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('verdict', json.load(open(sys.argv[1])).get('status','?')))" $d/validate.json 2>/dev/null) dl_fail=$(cat $d/pr/*/dl_fail 2>/dev/null | tr '\n' ' ')"; done
+echo "=== END $(date)"
