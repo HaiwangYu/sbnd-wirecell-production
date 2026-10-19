@@ -23,6 +23,23 @@ Steps (owner, 2026-10-19): (1) read the guide; (2) validate the aurora workflow 
 
 `pbs/build-and-g4.pbs`: one debug job = clean build (toolkit + larwirecell) + gates G1/G2 + `run-pairs.sh` on the 2 reference pairs with `WC_KEEP=validation` into `$R/aurora-run`. Results: section 5.
 
+Job 8944988 (debug, 4 min queue, 22 min wall; 04:14-04:36 UTC):
+- build: `WCB_RC=0`, `rpath_stripped=20`, `ldd_not_found=0`, `MRB_RC=0`, `tree_wirecell_refs=0`; larwirecell built from `sbnd-wc-flatcaf ad5d942`.
+- G2: `make_RootFlatTreeVisitor_factory` 1, `T_overlap` 1, `respond_to_open_input_file` 3, `prong_trackid` 1.
+- G4 run: both pairs `OK`, `validate.json` `PASS`, `dl_fail` 0; 20 events with Wire-Cell output. First run of the 2-step chain on Aurora.
+- cost (2 pairs alone on the node, so no contention):
+
+| step | wall per event [s] | CPU per event [s] | max RSS [MB] | output per event [MB] |
+|---|---|---|---|---|
+| step1 | 36.5 | 20.3 | 1547 | 7.99 (validation keep: tar + Bee + h5) |
+| step2 | 16.7 | 14.0 | 1416 | 1.13 |
+| step3 | 0.3 | 0.2 | 427 | 1.08 |
+| validate | 1.0 | 0.9 | 741 | – |
+
+  r8 at FNAL: ~29-37 s per event all steps. Aurora here: 54 s wall per event per slot, 35 s CPU.
+- value-by-value comparison with r8 (`compare-outputs.py`, UAN): see the log.
+
+
 ## 3. The new sample (inventory 2026-10-19)
 
 `/lus/flare/projects/neutrinoGPU/abhat/sbnd/gen2-wct0319-bnb-1m-*`, sbndcode `v10_14_02_03 e26:prof`, `prodgenie_corsika_proton_rockbox0p1_sbnd`, standard gen/g4/detsim/reco1/reco2 fcls, CAFmaker `cafmakerjob_sbnd_sce_systtools_and_fluxwgt_and_g4rw.fcl`; provenance in each directory's `restartable_provenance/provenance.json` (`wct_source 0319ea67`). Layout: `reco1/NNNNNN/NNNNNN/reco1-detsim-g4-gen-<id>.root` (+ `.json` sidecar), `caf/NNNNNN/NNNNNN/reco2-reco1-detsim-g4-gen-<id>.flat.caf.root` (+ `.json`).
