@@ -57,7 +57,7 @@ export APPTAINERENV_SL7_SETUP="$SL7_SETUP" APPTAINERENV_Y="$Y"
 export APPTAINERENV_USER="$USER" APPTAINERENV_TERM="${TERM:-xterm}"
 export APPTAINERENV_HTTP_PROXY=$HTTP_PROXY APPTAINERENV_HTTPS_PROXY=$HTTPS_PROXY
 export APPTAINERENV_http_proxy=$HTTP_PROXY APPTAINERENV_https_proxy=$HTTPS_PROXY APPTAINERENV_no_proxy=$no_proxy
-for v in ${PASS_ENV:-}; do export "APPTAINERENV_$v=${!v}"; done
+for v in ${PASS_ENV:-}; do [ -n "${!v+x}" ] && export "APPTAINERENV_$v=${!v}"; done   # only the ones that are set
 
 # The toolkit cfg (clus.jsonnet sce_map_file) hard-codes
 # /cvmfs/sbnd.opensciencegrid.org/products/sbnd/sbnd_data/v01_42_00/SCEoffsets/...;

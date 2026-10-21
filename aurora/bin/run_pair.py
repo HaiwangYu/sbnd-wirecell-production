@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """One reco1 / flat-CAF pair through the three steps, with exception handling (HOST side).
 
-    run_pair.py <id> <sim|data> <reco1.root> <flat.caf.root> <workdir> <schema.json>
+    run_pair.py <id> <sim|data> <reco1.root[,reco1.root...]> <flat.caf.root> <workdir> <schema.json>
+
+Multi-reco1 unit (gen2 BNB 1M on Aurora: one flat CAF is made from the reco2 of 20 reco1 files,
+one subrun each, 0-6 events after the rockbox filter): the reco1 column holds the files
+comma-separated, in the CAF sidecar's parent order (find-pairs.py --caf-sidecar-dir).  Step 1
+is ONE lar over all of them (one -s each, art concatenates; --nskip / -n index the
+concatenation, so the step-1 slicing below is unchanged); the events are counted per file
+(reco1_files.json) and the pair is EMPTY only when every file is.  Steps 2-3 do not care: the
+merge keys on run/subrun/event.  Data (FrameShift) gets one step-0 copy per file.
 
 Each step runs inside the SL7 container (site config: WC_WRAP, WC_SL7_SETUP, WC_CPUSET), timed
 with /usr/bin/time -v and wrapped in `timeout -k 60 <limit>`.
@@ -52,6 +60,7 @@ import sys
 import time
 
 ID, REAL, RECO1, CAF, WORK, SCHEMA = sys.argv[1:7]
+RECO1S = RECO1.split(',')
 BIN = os.path.dirname(os.path.abspath(__file__))
 D = os.path.join(WORK, ID)
 os.makedirs(os.path.join(D, 'cost'), exist_ok=True)
@@ -74,6 +83,13 @@ KEEP = E.get('WC_KEEP', 'all')
 RECO1_ORIG = E.get('WC_RECO1_ORIG', RECO1)
 CAF_ORIG = E.get('WC_CAF_ORIG', CAF)
 STAMP = E.get('WC_STAMP_INPUT_FILE', '0') == '1'
+# Multi-reco1 units: the event numbers of the 20 subruns collide (1..10 each), so step 2 names
+# its per-event directories by run/subrun/event (toolkit per_event_name tokens) instead of the
+# event number; single-file units keep the r8 layout pr_evt<event>.
+if len(RECO1S) > 1 and 'WC_EVT_SUBDIR' not in E:
+    os.environ['WC_EVT_SUBDIR'] = 'pr_evt{run}_{subrun}_{event}'
+if STAMP and len(RECO1S) > 1 and 'WC_RECO1_ORIG' not in E:
+    sys.exit('run_pair.py: WC_STAMP_INPUT_FILE=1 needs WC_RECO1_ORIG with a multi-reco1 unit (one name for all files?)')
 if KEEP not in ('all', 'minimal', 'validation', 'semiprod'):
     sys.exit('run_pair.py: WC_KEEP must be all, minimal, validation or semiprod')
 COST = os.path.join(D, 'cost.tsv')
@@ -166,41 +182,56 @@ def locality_ok(path):
 
 
 log('start %s %s reco1=%s caf=%s' % (ID, REAL, RECO1, CAF))
-for what, p in (('reco1', RECO1), ('caf', CAF)):
+for what, p in [('reco1', r) for r in RECO1S] + [('caf', CAF)]:
     ok, why = locality_ok(p)
     if not ok:
         finish('FAIL precheck %s %s' % (what, why))
 
 # ---------------------------------------------------------------- step 0: FrameShift (data)
 FSDIR = os.path.join(D, 'fs')
-FSCOPY = os.path.join(FSDIR, os.path.basename(RECO1)[:-len('.root')] + '_frameshift.root')
+
+
+def fscopy(r1):
+    return os.path.join(FSDIR, os.path.basename(r1)[:-len('.root')] + '_frameshift.root')
 
 
 def step1_input():
-    """The file step 1 reads: the reco1, or (data) its FrameShift copy, made on first use."""
+    """What step 1 reads (comma-separated): the reco1 file(s), or (data) their FrameShift copies,
+    made on first use."""
     if not FRAMESHIFT:
         return RECO1
-    if not os.path.exists(FSCOPY):
-        rc, tf = container('step0', [os.path.join(BIN, 'step0-frameshift.sh'), RECO1, FSCOPY], T0)
-        cost_row('step0', 'all', 1, rc, tf, FSCOPY)
-        if rc != 0:
-            finish('FAIL step0 frameshift rc %d (see fs/frameshift-lar.log.gz, cost/step0.out)' % rc)
-        log('step0 FrameShift copy %s' % FSCOPY)
-    return FSCOPY
+    for i, r1 in enumerate(RECO1S):
+        fc = fscopy(r1)
+        if not os.path.exists(fc):
+            tag = 'all' if len(RECO1S) == 1 else 'f%d' % i
+            rc, tf = container('step0-' + tag, [os.path.join(BIN, 'step0-frameshift.sh'), r1, fc], T0)
+            cost_row('step0', tag, 1, rc, tf, fc)
+            if rc != 0:
+                finish('FAIL step0 frameshift rc %d on %s (see fs/frameshift-lar.log.gz, cost/step0-%s.out)' % (rc, r1, tag))
+            log('step0 FrameShift copy %s' % fc)
+    return ','.join(fscopy(r1) for r1 in RECO1S)
 
 
 # ---------------------------------------------------------------- step 1 (fixes 2, 4, 5)
 nfile = os.path.join(D, 'reco1_events')
-if not os.path.exists(nfile):
-    rc, _ = container('count-events', ['python3', os.path.join(BIN, 'count-events.py'), RECO1], 600)
+if not os.path.exists(nfile) or not os.path.exists(os.path.join(D, 'reco1_files.json')):
+    rc, _ = container('count-events', ['python3', os.path.join(BIN, 'count-events.py')] + RECO1S, 600)
     try:
-        n = int(open(os.path.join(D, 'cost', 'count-events.out')).read().split()[-1])
+        lines = open(os.path.join(D, 'cost', 'count-events.out')).read().strip().splitlines()
+        n = int(lines[-1].split()[-1])
+        per_file = [{'reco1': l.split(' ', 1)[1], 'events': int(l.split(' ', 1)[0])} for l in lines[-1 - len(RECO1S):-1]]
+        assert len(per_file) == len(RECO1S)
     except Exception:
-        finish('FAIL precheck cannot count the events of the reco1 file (rc %d)' % rc)
+        finish('FAIL precheck cannot count the events of the reco1 file(s) (rc %d)' % rc)
+    with open(os.path.join(D, 'reco1_files.json'), 'w') as f:
+        json.dump(per_file, f, indent=1)
     open(nfile, 'w').write('%d\n' % n)
 NEV = int(open(nfile).read())
+RECO1_FILES = json.load(open(os.path.join(D, 'reco1_files.json')))
+if len(RECO1S) > 1:
+    log('multi-reco1 unit: %d files, %d events (%s)' % (len(RECO1S), NEV, ' '.join(str(x['events']) for x in RECO1_FILES)))
 if NEV == 0:
-    finish('EMPTY no events in the reco1 file', reco1_events=0)
+    finish('EMPTY no events in the reco1 file(s)', reco1_events=0, reco1_files=RECO1_FILES)
 
 OPHIT = re.compile(r'<OpHitSource:tpc0> run (\d+) subrun (\d+) event (\d+)')
 
@@ -364,5 +395,5 @@ mj = json.load(open(os.path.join(mdir, 'merge.json')))
 missing = mj['n_caf_events_without_wirecell']
 info = dict(skipped=skipped, lost_slices=lost, step2_failed=step2_failed, caf_events=mj['n_caf_events'],
             wirecell_events=mj['n_wirecell_events'], caf_events_without_wirecell=missing,
-            incomplete_files=coll['incomplete'])
+            incomplete_files=coll['incomplete'], reco1_events=NEV, reco1_files=RECO1_FILES)
 finish('OK' if (missing == 0 and not skipped and not lost and not step2_failed) else 'PARTIAL', **info)

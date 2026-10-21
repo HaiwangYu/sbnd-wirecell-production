@@ -1,0 +1,28 @@
+#!/bin/bash
+#PBS -N sbnd-wc-smoke
+#PBS -A neutrinoGPU::debug2
+#PBS -q debug
+#PBS -l select=1
+#PBS -l walltime=00:59:00
+#PBS -l filesystems=flare:home
+#PBS -j oe
+# The three-step workflow for the pairs in PAIRS on ONE Aurora compute node in the debug queue
+# (<= 1 h, 1 running job per user): smoke tests and sizing runs.
+#   qsub -v "REPO=<.../aurora>,PAIRS=<pairs.tsv>,WORK=<workdir>[,WC_MAXPAR=N][,WC_KEEP=semiprod][,POST=<script>]" pbs/run-pairs-debug.pbs
+# Writes <WORK>/node.log every 30 s: MemAvailable, our lar/wire-cell/python RSS, process counts,
+# load -- the per-node memory picture under load (sizing the workers per node).  POST (optional)
+# runs on the host after the pool, with REPO/WORK/the site config in the environment.
+set -u
+REPO=${REPO:?}; PAIRS=${PAIRS:?}; WORK=${WORK:?}
+export WC_KEEP=${WC_KEEP:-semiprod}
+cd "$REPO"; mkdir -p "$WORK"
+echo "=== $(date) $(hostname) job ${PBS_JOBID:-} nproc $(nproc) MemTotal $(awk '/MemTotal/{printf "%d GB", $2/1048576}' /proc/meminfo) WC_MAXPAR=${WC_MAXPAR:-default} WC_KEEP=$WC_KEEP PAIRS=$PAIRS WORK=$WORK"
+( while true; do
+    echo "$(date '+%F %T') avail_GB=$(awk '/MemAvailable/{printf "%d",$2/1048576}' /proc/meminfo) ours_GB=$(ps -u "$USER" -o rss=,comm= | awk '$2 ~ /^(lar|wire-cell|python3)$/ {s+=$1} END{printf "%.1f", s/1048576}') lar=$(pgrep -u "$USER" -x lar | wc -l) wct=$(pgrep -u "$USER" -x wire-cell | wc -l) pairs=$(pgrep -u "$USER" -f 'bin/run_pair.py' | wc -l) load=$(cut -d' ' -f1 /proc/loadavg)"
+    sleep 30
+  done >> "$WORK/node.log" ) &
+SAMPLER=$!
+bash bin/run-pairs.sh site/aurora.sh "$PAIRS" "$WORK" ${SCHEMA:+"$SCHEMA"}
+kill $SAMPLER 2>/dev/null
+if [ -n "${POST:-}" ]; then echo "=== POST $POST"; source site/aurora.sh; bash "$POST"; fi
+echo "=== $(date) done"; tail -5 "$WORK/pool.log"; cat "$WORK/cost-summary.md"

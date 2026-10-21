@@ -6,6 +6,11 @@
 # unless DLVTX_DUMP=false.
 set -u
 TAR=${1:?tar}; OUT=${2:?outdir}; REAL=${3:?sim|data}; DUMP=${DLVTX_DUMP:-true}
+# Per-event output directory template (toolkit Clus::per_event_name): the default 'pr_evt%1%'
+# is the art event number alone, which COLLIDES inside a multi-reco1 unit (gen2 BNB 1M: event
+# numbers restart at 1 in every subrun) -- run_pair.py sets WC_EVT_SUBDIR=pr_evt{run}_{subrun}_{event}
+# for those.  Every name must start with pr_evt (collect-good.py, the keep modes, this script).
+SUBDIR=${WC_EVT_SUBDIR:-pr_evt%1%}
 # ai-helper issue 41: reco<->truth matching trees on MC (needs the step-1 labeler's
 # truth_track table; written nowhere else).  WC_TRUTH_MATCH=0 turns it off.
 TM=false; [ "$REAL" = sim ] && [ "${WC_TRUTH_MATCH:-1}" = 1 ] && TM=true
@@ -15,6 +20,7 @@ python3 -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(m) fo
   || { echo "step2.sh: SCN_Vertex/torch/sparseconvnet not importable (DL environment missing)" >&2; exit 97; }
 wire-cell -l stdout -L debug -c pgrapher/experiment/sbnd/wct-pr.jsonnet \
   --tla-str input="$TAR" --tla-str reality="$REAL" \
+  --tla-str evt_subdir="$SUBDIR" \
   --tla-code dl_vtx_dump="$DUMP" --tla-code flat_tree=true --tla-code truth_match=$TM > wct.log 2>&1
 rc=$?
 grep -c "DL vertex failed" wct.log > dl_fail

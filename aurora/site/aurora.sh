@@ -10,3 +10,6 @@ export WC_DAY_START=${WC_DAY_START:-8} WC_DAY_END=${WC_DAY_END:-20}
 export WC_MEM_GUARD_GB=${WC_MEM_GUARD_GB:-800}
 export WC_SYS_MIN_AVAIL_GB=${WC_SYS_MIN_AVAIL_GB:-50}
 export WC_KRB_WAIT=0
+# The wrapper runs apptainer --cleanenv: the per-step knobs run_pair.py / the steps read from the
+# environment must be forwarded explicitly (only those that are set are).
+export PASS_ENV="${PASS_ENV:-} WC_EVT_SUBDIR WCLS_INPUT_FILE DLVTX_DUMP WC_TRUTH_MATCH"
