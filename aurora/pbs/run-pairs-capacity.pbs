@@ -1,0 +1,34 @@
+#!/bin/bash
+#PBS -N sbnd-wc-prod
+#PBS -A neutrinoGPU::debug2
+#PBS -q capacity
+#PBS -l select=8
+#PBS -l walltime=06:00:00
+#PBS -l filesystems=flare:home
+#PBS -j oe
+# The three-step workflow on SEVERAL Aurora nodes (capacity queue: 1-16 nodes, <= 168 h, 2 running
+# jobs per user; prod needs >= 256 nodes).  Every node runs its own bin/run-pairs.sh pool over its
+# slice of PAIRS (round-robin by line, so the slices balance; WORK/node<k>/slice.tsv) into WORK/node<k>/; one `mpiexec
+# -ppn 1` launches pbs/node-pool.sh on each node.  Resume: resubmit with the same PAIRS and WORK
+# and the same number of nodes -- every node skips its OK/EMPTY pairs and reuses DONE markers.
+#   qsub -l select=<N> -v "REPO=<.../aurora>,PAIRS=<pairs.tsv>,WORK=<workdir>[,WC_MAXPAR=100][,WC_KEEP=semiprod][,SCHEMA=...]" pbs/run-pairs-capacity.pbs
+set -u
+REPO=${REPO:?}; PAIRS=${PAIRS:?}; WORK=${WORK:?}
+export WC_KEEP=${WC_KEEP:-semiprod} WC_MAXPAR=${WC_MAXPAR:-100}
+cd "$REPO"; mkdir -p "$WORK"
+NN=$(sort -u "$PBS_NODEFILE" | wc -l)
+echo "=== $(date) $(hostname) job ${PBS_JOBID:-} nodes $NN PAIRS=$PAIRS ($(grep -vc '^#' "$PAIRS") pairs) WORK=$WORK WC_MAXPAR=$WC_MAXPAR WC_KEEP=$WC_KEEP"
+cp -f "$PAIRS" "$WORK/pairs.tsv"
+# the slices: node k gets lines k, k+NN, k+2NN, ... (header kept)
+for k in $(seq 0 $((NN - 1))); do
+  mkdir -p "$WORK/node$k"
+  { head -1 "$PAIRS"; grep -v '^#' "$PAIRS" | awk -v k=$k -v n=$NN 'NR % n == k'; } > "$WORK/node$k/slice.tsv"
+done
+mpiexec -n "$NN" -ppn 1 --cpu-bind none bash "$REPO/pbs/node-pool.sh" "$REPO" "$WORK" ${SCHEMA:+"$SCHEMA"}
+echo "=== $(date) all pools done"
+# the summary over the nodes
+for k in $(seq 0 $((NN - 1))); do echo "node$k: $(tail -1 "$WORK/node$k/pool.log" 2>/dev/null)"; done
+cat "$WORK"/node*/*/status 2>/dev/null | awk '{s[$1]++} END{for (k in s) printf "%s %d  ", k, s[k]; print ""}'
+python3 "$REPO/bin/cost-summary.py" "$WORK"/node* > "$WORK/cost-summary.md" 2>&1 || true
+tail -8 "$WORK/cost-summary.md"
+echo "=== $(date) done"

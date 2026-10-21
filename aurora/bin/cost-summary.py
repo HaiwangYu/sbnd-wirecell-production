@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Summarise the per-pair cost.tsv (run_pair.py) of a run-pairs.sh work dir.
-    cost-summary.py <workdir>      (markdown to stdout)
+    cost-summary.py <workdir> [<workdir> ...]      (markdown to stdout; several = one summary over all,
+                                                    e.g. the node<k> dirs of a multi-node job)
 Successful runs (rc 0) give the cost per event; failed tries (crashes, timeouts) are listed
 separately as wasted compute."""
 import collections, csv, glob, json, os, sys
-W = sys.argv[1]
+W = ' '.join(sys.argv[1:])
 rows, nev, st = [], 0, collections.Counter()
-for d in sorted(glob.glob(os.path.join(W, '*', 'status'))):
+for d in sorted(d for w in sys.argv[1:] for d in glob.glob(os.path.join(w, '*', 'status'))):
     pd = os.path.dirname(d)
     st[open(d).read().split()[0] if open(d).read().strip() else '?'] += 1
     m = os.path.join(pd, 'merged', 'merge.json')
