@@ -41,7 +41,7 @@ Per reco1 / flat-CAF pair (`bin/run_pair.py`):
 
 | component | where | r8 pin |
 |---|---|---|
-| wire-cell-toolkit | `HaiwangYu/wire-cell-toolkit` branch `sbnd-wc-flatcaf` | `4b6853d4`. Its `cfg/` is used LIVE: it holds both steps' configuration, including the step-1 jsonnet that the `sbnd/` wrapper imports |
+| wire-cell-toolkit | `HaiwangYu/wire-cell-toolkit` branch `sbnd-wc-flatcaf` | `4b6853d4` = r8. **The BNB 1M production pin is `d06a47d7`** (4b6853d4 + `Clus::per_event_name` + the `TensorFileSource` equal-ident fix; both inert for r8-style inputs, r8 reproduced on it, 2026-10-21). Its `cfg/` is used LIVE: it holds both steps' configuration, including the step-1 jsonnet that the `sbnd/` wrapper imports |
 | larwirecell | `HaiwangYu/larwirecell` branch `sbnd-wc-flatcaf` | `73c79bc`, or the branch head `ad5d942`, which adds only the `WCLS_INPUT_FILE` override (inactive unless set) |
 | wcp-porting-validation | `WireCell/wcp-porting-validation` `main` | the step-1 fcls `sbnd/wcls-img-clus-matching{,-data}.fcl` and `wcls-img-clus-matching-pr-hits.fcl` (unchanged since r8) |
 | this repo | `HaiwangYu/sbnd-wirecell-production` `main` | the workflow; pull the latest |
@@ -87,7 +87,7 @@ On a UAN:
 ```bash
 Y=/lus/flare/projects/neutrinoGPU/yuhw
 cd $Y/wire-cell-toolkit && git status --short && git fetch fork && git checkout -b sbnd-wc-flatcaf fork/sbnd-wc-flatcaf   # tree clean on 2026-10-18; if the branch exists: git checkout sbnd-wc-flatcaf && git merge --ff-only fork/sbnd-wc-flatcaf
-git log -1 --format=%h          # must be 4b6853d4 (or a later head the owner names)
+git log -1 --format=%h          # 4b6853d4 = r8; d06a47d7 for the BNB 1M production (or a later head the owner names)
 git status --short cfg          # must be empty: cfg/ is read live by every job
 cd $Y/larwirecell && git fetch && git checkout sbnd-wc-flatcaf && git pull --ff-only   # head ad5d942 (or 73c79bc)
 cd $Y/larsoft-wct/v10_14_02/srcs/larwirecell && git fetch && git checkout sbnd-wc-flatcaf && git pull --ff-only   # the MRB clone builds from HERE
@@ -196,7 +196,7 @@ Record the gate's timing: `cost-summary.md`, seconds per event per step. The 2-s
      ```bash
      bin/find-pairs.py --caf-sidecar-dir <sample>/caf --reality sim -o pairs.tsv   # reco1 tree defaults to <sample>/reco1
      ```
-     The unit is the CAF + all its parents (comma-separated in the reco1 column, one `lar` over them), the 5th column is the sum of the reco1 sidecars' `event_count` (must equal the CAF's, else the CAF is skipped). About 30 min per 75k-file directory on Lustre. `run_pair.py` then names step 2's directories `pr_evt<run>_<subrun>_<event>` (the subruns' event numbers restart at 1; needs the toolkit's `Clus::per_event_name`, 2026-10-21).
+     The unit is the CAF + all its parents (comma-separated in the reco1 column, one `lar` over them), the 5th column is the sum of the reco1 sidecars' `event_count` (must equal the CAF's, else the CAF is skipped). About 30 min per 75k-file directory on Lustre. `run_pair.py` then names step 2's directories `pr_evt<run>_<subrun>_<event>` (the subruns' event numbers restart at 1; needs the toolkit's `Clus::per_event_name` AND the `TensorFileSource` fix that keeps consecutive sets with equal idents apart — `sbnd-wc-flatcaf` d06a47d7, 2026-10-21; without the second, ~2–3 % of the events vanish silently from step 2).
    - Path mode runs on a UAN (no samweb on Aurora).
    - Check `pairs.tsv.skipped`. Every reco1 without a CAF is listed there, and the count goes in the report.
    - The 5th column (events) is `-` in path mode, which is fine.
