@@ -71,8 +71,11 @@ For the new sample the owner chose `semiprod`.
 - **Build image:** `$Y/images/fnal-dev-sl7.sif`. The bare `slf7.sif` lacks the `-devel` headers.
 - **`/tmp` on a compute node is a RAM tmpfs** (504 GB of the 1.1 TB): no node-local disk. Work dirs go on Flare.
 - **Node:** 104 cores (208 threads), 1.1 TB. `site/aurora.sh` runs `WC_MAXPAR=100` pairs per node (r8 RSS is ~1.5–2.5 GB per pair; rare peaks to 5.3 GB).
+- **The job cgroup caps tasks, not memory:** `/sys/fs/cgroup/jobs/<jobid>/pids.max = 8192` (processes + threads). A running step-1 unit is ~80–100 tasks (`lar` ~30–80 threads, apptainer `starter` 9, `squashfuse_ll` 9, the bash/time/timeout chain), so ~100 units fill it and the next container launches die with `runtime/cgo: pthread_create failed: Resource temporarily unavailable` (lar rc 134) or `no apptainer` from the wrapper (2026-10-21, jobs 8949343/8949344). `run-pairs.sh` now waits below `WC_PIDS_HEADROOM` tasks left; 100 workers per node (one per core) is the measured operating point, 9,000 events per node-hour, 153 GB of 1.1 TB used.
+- **`apptainer --cleanenv` drops the environment:** a knob a step reads from the environment (`WC_EVT_SUBDIR`, `WCLS_INPUT_FILE`, `DLVTX_DUMP`, `WC_TRUTH_MATCH`) reaches the container only through `PASS_ENV` (`site/aurora.sh` lists them; the wrapper forwards the ones that are set). Before 2026-10-21 none of them did — the defaults happened to be right.
+- **Never edit `run-pairs.sh` (or any bash script) while a job runs it:** bash reads the file as it goes; the edit killed job 8949354's pool mid-launch.
 - **Account and queues:**
-  - production: `-A neutrinoGPU -q prod`;
+  - production: `-A neutrinoGPU -q prod` — but `prod` routes to `small`, which needs **≥ 256 nodes** (12 h); 1-node production goes to `capacity` (1–16 nodes, 168 h, 2 running jobs per user, 512 nodes shared) or `debug-scaling` (1–256 nodes, 1 h, 1 running per user);
   - short tests: `-A neutrinoGPU::debug2 -q debug -l walltime=00:59:00`, as #29 used;
   - `qstat -Qf` lists the others (`debug-scaling` 1–256 nodes, `capacity` 1–16 nodes).
 - **Flare is nearly full:** 95 % of the project's 3.2 PB in September, 98 % of the file system (83 TB free) on 2026-10-18. Check `df`/quota before writing TBs: r8 `semiprod` keeps ~3.5 MB per event, and `validation` adds ~2 MB per event of Bee.
@@ -189,6 +192,11 @@ Record the gate's timing: `cost-summary.md`, seconds per event per step. The 2-s
    ```bash
    bin/find-pairs.py --reco1-dir <reco1 tree> --caf-dir <caf tree> --reality sim -o pairs.tsv
    ```
+   - **Multi-reco1 samples** (the gen2 BNB 1M, 2026-10: each flat CAF merges the reco2 of 20 reco1 files, one subrun each, and is named after ONE of them): the name rule pairs a 50-event CAF with a 0–6 event reco1. Use the CAF sidecars instead:
+     ```bash
+     bin/find-pairs.py --caf-sidecar-dir <sample>/caf --reality sim -o pairs.tsv   # reco1 tree defaults to <sample>/reco1
+     ```
+     The unit is the CAF + all its parents (comma-separated in the reco1 column, one `lar` over them), the 5th column is the sum of the reco1 sidecars' `event_count` (must equal the CAF's, else the CAF is skipped). About 30 min per 75k-file directory on Lustre. `run_pair.py` then names step 2's directories `pr_evt<run>_<subrun>_<event>` (the subruns' event numbers restart at 1; needs the toolkit's `Clus::per_event_name`, 2026-10-21).
    - Path mode runs on a UAN (no samweb on Aurora).
    - Check `pairs.tsv.skipped`. Every reco1 without a CAF is listed there, and the count goes in the report.
    - The 5th column (events) is `-` in path mode, which is fine.
