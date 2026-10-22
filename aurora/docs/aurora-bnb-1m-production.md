@@ -175,6 +175,44 @@ Fix for the pool, drafted (not applied while 16 pools execute the script — bas
 
 **Run 2 (resume), submitted 13:03 UTC:** jobs **8953303** (A) and **8953304** (B), same PAIRS/WORK, 8 nodes × **4 h** (short walltime backfills within ~1–3 h; ~3,100 units ≈ 165k events ≈ 1.5 h on 16 healthy nodes), `WC_RETRY_PARTIAL=1` (the PARTIALs are node-condition artefacts, not data), `maxpar.override` files removed (the new cap of 77 applies). The 8-h run-1 outputs stay in place; the resume skips OK/EMPTY units and resumes the rest from their DONE markers.
 
+### 4d.3 DONE 2026-10-22 17:58 UTC: 11,888 units, 627,205 events, 627,127 with Wire-Cell output
+
+| | A | B | total |
+|---|---|---|---|
+| units OK / PARTIAL / FAIL | 5,935 / 9 / 0 | 5,935 / 9 / 0 | 11,870 / 18 / 0 |
+| merged CAFs written | 5,944 | 5,944 | 11,888 |
+| CAF events | 313,538 | 313,667 | **627,205** |
+| events with `recTreeWireCell` | 313,518 | 313,609 | **627,127** (99.988 %) |
+| events without | 20 | 58 | 78: 13 skipped in step 1 (ClusteringDeghost), 65 lost to the step-2 segfaults of run 1's stalled nodes (units PARTIAL after retry) |
+| node-hours charged (debug2) | 64.3 + 32.2 | 64.2 + 29.8 | **190.6** (+0.1 tail); debug2 has 92.7 left |
+| wall | run 1 8 h × 16 nodes (04:41–12:58), run 2 ~3.5 h × 16 (13:38–17:38), tail 7 min × 1 | | 13.3 h end to end from the first start, 16.2 h from submission |
+
+Steady-state cost per event (cost-summary.md, both halves alike): step 1 **34 s wall / 31 s CPU**, RSS median 1.6 GB (max 6.4 GB), 8.4 MB of step-1 output; step 2 4.7–5.9 s wall, 1.4 GB; merge 0.15 s; validate 0.8 s. Per node at 77 units: ~7,000–8,000 events/node-hour when nothing stalls. The real cost was twice the plan because of run 1's nine stalled nodes.
+
+**Outputs** (`WC_KEEP=semiprod`): `$Y/production-prep/bnb1m/full/{A,B}/node<k>/<unit>/merged/*.root` (the flat CAF with the `recTreeWireCell` branches; 11,888 files), `pr/all/` (per-event `pr_evt<run>_<subrun>_<event>/tracking-pr.root` + `mabc-pr.zip`, `wct.log.gz`), `events.json`, `cost.tsv`; `cost-summary.md` per half; `skipped-events.tsv` (the 13 below); `jobs.txt`. Disk: see the log (du running at the time of writing).
+
+**The 13 events the toolkit cannot cluster** (step-1 lar killed by the RSS watchdog at 48 GB inside `ClusteringDeghost`, all `truth: 0 nu`; rc 137 = killed; `$Y/production-prep/bnb1m/full/skipped-events.tsv`):
+
+| run | subrun | event | half | unit (reco2-reco1-detsim-g4-gen-…) | index in unit |
+|---|---|---|---|---|---|
+| 2100197 | 23 | 5 | A | -gen-c66b-68d3-da48-f711 | 36 |
+| 2100465 | 19 | 8 | A | -gen-14e7-4cfa-8ed6-9be8 | 38 |
+| 2105189 | 95 | 9 | A | -gen-476a-f511-0adf-2efc | 21 |
+| 2105252 | 60 | 9 | B | -gen-e5fd-0f26-795a-bfd9 | 58 |
+| 2105311 | 35 | 5 | B | -gen-e5e0-ceac-2a9a-ec50 | 28 |
+| 2105404 | 87 | 10 | B | -gen-e3e0-3290-8946-ca65 | 16 |
+| 2110053 | 20 | 3 | A | -gen-e588-8e0c-a689-da26 | 43 |
+| 2110173 | 11 | 10 | B | -gen-767c-03db-5015-665f | 5 |
+| 2110302 | 66 | 6 | B | -gen-6aef-1095-71f7-d0a3 | 32 |
+| 2110430 | 76 | 8 | A | -gen-c673-66bc-2e23-5890 | 25 |
+| 2110585 | 82 | 2 | B | -gen-31ba-8720-e633-8a0e | 56 |
+| 2110649 | 26 | 10 | B | -gen-e643-6b8f-590d-2076 | 5 |
+| 2110746 | 95 | 3 | A | -gen-07ff-0767-90d5-5d0d | 12 |
+
+Reprocess them (and the 65 step-2 losses, listed per unit in `events.json`) once the clustering is fixed: `run_pair.py --nskip <index> -n 1` on the unit, or a full rerun of the 18 PARTIAL units with `WC_RETRY_PARTIAL=1`.
+
+**Lessons recorded in the guide / code:** ramp-aware pids guard (`run-pairs.sh`), RSS watchdog (`run_pair.py`), `rse_of_flat` on truncated files (`wcflat.py`), the `TensorFileSource` equal-ident fix and `per_event_name` in the toolkit (pin d06a47d7), short walltimes backfill (35 min vs 3 h), one pool per node with resume by resubmission works (run 2 picked up 2,500 units and 437 failures with no manual bookkeeping), Lustre metadata on the UAN is slow enough that status sweeps over 12k units take minutes.
+
 ## 4c. Proposed parameters for the full run (as reviewed; superseded by 4d)
 
 - **Unit and layout:** multi-reco1 units from the sidecars (7,861 units / 414,774 events in the 7 directories with CAFs now; ~620k when shard03's CAFs land), `WC_KEEP=semiprod`, step-2 directories `pr_evt<run>_<subrun>_<event>`.
@@ -202,6 +240,7 @@ Expected rate of such pairs: with 10 event numbers per subrun and ~2.6 events pe
 - 2026-10-21: owner: multi-reco1 unit, smoke as several ~100-event debug jobs to size the full run (~620k events now), then propose parameters and wait. Implemented (section 3); equality test job 8949305 (debug, 1 node): the eee3 unit (20 files, 44 events) as one multi-reco1 pair plus the same 20 files as single pairs against the same CAF, WC_MAXPAR 21, plus a `--nskip 10 -n 5` step-1 run over the 20 files (must give entries 10–14 of the multi run). Queue / allocation survey (section 4a).
 - 2026-10-21 03:37 UTC: job 8949305 done in 23 min. Step 1 ran all 44 events as one `lar` (rc 0, 23.5 s/event, RSS 1.6 GB), the `--nskip 10 -n 5` run gave exactly entries 10–14 of the full run (NSKIP-CHECK PASS), the 2 empty files gave EMPTY as singles and were skipped silently inside the multi unit — but the multi unit came out PARTIAL with 10 of 44 events. **Cause: Wire-Cell names an event by its set ident = the art event number alone**, and in this sample the event numbers restart at 1 in every subrun (gen makes 10 per subrun), so the 44 events of one unit share 10 idents. Step 1 wrote all 44 tensor sets (duplicate member names in the tar), step 2 processed all 44 (44 `recTreeWireCell` written, 44 events in the Bee zip) but wrote them into 10 `pr_evt<ident>` directories, each later event overwriting the earlier one. Fix (toolkit, uncommitted on `sbnd-wc-flatcaf`, for the owner to review): `Clus::per_event_name` (`clus/{inc,src}/PerEventName`), one helper for every per-event writer (both SBND tracking visitors, the tagger output, the flat tree, PrDisplayDump, the MABC's own Bee zip) that expands `{run}`, `{subrun}`, `{event}`, `{ident}` tokens before the boost::format of the ident; the default `pr_evt%1%` is untouched (r8 layout byte-identical), `run_pair.py` sets `WC_EVT_SUBDIR=pr_evt{run}_{subrun}_{event}` for multi-reco1 units and `step2.sh` passes it as `evt_subdir`. Doctest `clus/test/doctest_per_event_name.cxx`. Job 8949354 (capacity queue, 1 node): waits for the smoke jobs (they run the installed libraries), rebuilds the toolkit incrementally, reruns the equality test, then the r8 reference pairs with the default layout.
 - 2026-10-21 04:20 UTC: smoke jobs done (section 4): 9,000 events per node-hour at 100 workers; the cgroup pids.max = 8192 wall found (not memory, not cores). 04:24: job 8949354 rebuilt the toolkit with the fix (WCB_RC 0, doctests clus per_event_name 9/9, root 12/12) but its equality test died because `run-pairs.sh` was edited (the pids guard) while that bash was running it — resubmitted as 8949403 (`fix2`, capacity queue): equality test + nskip check + the r8 reference pairs, with an in-job task/thread sampler.
+- 2026-10-22 17:58 UTC: **production complete** (4d.3): 11,870 OK + 18 PARTIAL, 627,127 of 627,205 events with Wire-Cell output, 190.6 node-hours. Run 2 ended 17:29 (A) / 17:05 (B); the 3 collect-bug units redone in a 7-min debug job (8954111).
 - 2026-10-22 14:20 UTC: run 2 running since 13:38 (8 + 8 nodes, 35-min queue wait); the ramp guard held (77/node, 0 pthread failures); the RSS watchdog identified the hog: step-1 lar in `ClusteringDeghost` on 0-nu events with huge clusters, ~1 GB/s (4d.2). `wcflat.rse_of_flat` fixed for truncated step-2 files (3 units failed the resume in 15 s; rerun in the tail).
 - 2026-10-22 13:03 UTC: run 1 ended at walltime with 464k events OK; 9 nodes had stalled 3–4 h on a ~1 GB/s memory climb to 1.08 TB by an unidentified process (4d.2; the GDML-frozen lars are victims, wire-cell is exonerated). Pool guard + RSS watchdog committed (8e392f2); resume jobs 8953303/8953304 (8 × 4 h each, retry PARTIAL) queued.
 - 2026-10-22 05:02 UTC: jobs running since 04:41 (A) / 04:58 (B). A lost 221 units in the thread ramp (section 4d.1); live `maxpar.override = 76` on all 16 pools; ramp-aware guard drafted for the resume job.
