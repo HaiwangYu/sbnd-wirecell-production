@@ -172,7 +172,8 @@ def container(name, cmd, timeout_s, cwd=None):
             rss = tree_rss_kb(p.pid)
             peak = max(peak, rss)
             if rss > MAX_RSS_GB * 1048576:
-                log('%s: rss %.1f GB > %.0f GB limit -- killing the process tree' % (name, rss / 1048576, MAX_RSS_GB))
+                log('%s: rss %.1f GB > %.0f GB limit -- killing the process tree; biggest: %s'
+                    % (name, rss / 1048576, MAX_RSS_GB, tree_top(p.pid)))
                 kill_tree(p.pid)
                 rc = p.wait()
                 open(os.path.join(D, 'cost', name + '.rss_killed'), 'w').write('%.1f GB\n' % (rss / 1048576))
@@ -217,6 +218,23 @@ def tree_pids(root, table=None):
 def tree_rss_kb(root):
     pids, table = tree_pids(root)
     return sum(table[pid][1] for pid in pids if pid in table)
+
+
+def tree_top(root, n=3):
+    """The n biggest processes of the tree as 'pid comm rss_GB', for the kill log line."""
+    pids, table = tree_pids(root)
+    rows = []
+    for pid in pids:
+        if pid not in table:
+            continue
+        try:
+            with open('/proc/%d/comm' % pid) as f:
+                comm = f.read().strip()
+        except OSError:
+            comm = '?'
+        rows.append((table[pid][1], pid, comm))
+    rows.sort(reverse=True)
+    return ', '.join('%d %s %.1f GB' % (pid, comm, kb / 1048576) for kb, pid, comm in rows[:n])
 
 
 def kill_tree(root):
