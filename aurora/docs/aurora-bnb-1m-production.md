@@ -189,7 +189,7 @@ Fix for the pool, drafted (not applied while 16 pools execute the script — bas
 
 Steady-state cost per event (cost-summary.md, both halves alike): step 1 **34 s wall / 31 s CPU**, RSS median 1.6 GB (max 6.4 GB), 8.4 MB of step-1 output; step 2 4.7–5.9 s wall, 1.4 GB; merge 0.15 s; validate 0.8 s. Per node at 77 units: ~7,000–8,000 events/node-hour when nothing stalls. The real cost was twice the plan because of run 1's nine stalled nodes.
 
-**Outputs** (`WC_KEEP=semiprod`): `$Y/production-prep/bnb1m/full/{A,B}/node<k>/<unit>/merged/*.root` (the flat CAF with the `recTreeWireCell` branches; 11,888 files), `pr/all/` (per-event `pr_evt<run>_<subrun>_<event>/tracking-pr.root` + `mabc-pr.zip`, `wct.log.gz`), `events.json`, `cost.tsv`; `cost-summary.md` per half; `skipped-events.tsv` (the 13 below); `jobs.txt`. Disk: see the log (du running at the time of writing).
+**Outputs** (`WC_KEEP=semiprod`): `$Y/production-prep/bnb1m/full/{A,B}/node<k>/<unit>/merged/*.root` (the flat CAF with the `recTreeWireCell` branches; 11,888 files), `pr/all/` (per-event `pr_evt<run>_<subrun>_<event>/tracking-pr.root` + `mabc-pr.zip`, `wct.log.gz`), `events.json`, `cost.tsv`; `cost-summary.md` per half; `skipped-events.tsv` (the 13 below); `jobs.txt`. Disk at semiprod: half B = 908 GB (du 18:10 UTC; A alike), i.e. ~1.8 TB for the 627k events ≈ 2.9 MB/event (step-1 tars 8.4 MB/event are removed, the step-2 per-event files 0.84 MB + merged CAF 0.67 MB + Bee zips/logs kept).
 
 **The 13 events the toolkit cannot cluster** (step-1 lar killed by the RSS watchdog at 48 GB inside `ClusteringDeghost`, all `truth: 0 nu`; rc 137 = killed; `$Y/production-prep/bnb1m/full/skipped-events.tsv`):
 
