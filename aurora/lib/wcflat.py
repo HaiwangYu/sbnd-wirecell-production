@@ -89,7 +89,10 @@ def read_flat_entry(tree, entry=0):
 
 def rse_of_flat(path):
     """(run, subrun, evt) of the one entry of recTreeWireCell in a tracking-pr.root, or None."""
-    f = ROOT.TFile.Open(path)
+    try:
+        f = ROOT.TFile.Open(path)
+    except OSError:        # ROOT >= 6.28 raises instead of returning a zombie (a truncated file
+        return None        # left by a killed step 2 made collect-good.py fail the unit)
     if not f or f.IsZombie():
         return None
     t = f.Get(TREE_NAME)
