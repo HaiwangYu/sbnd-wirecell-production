@@ -74,6 +74,13 @@ TV = int(E.get('WC_TIMEOUT_VALIDATE', 3600))
 MAX_BAD = int(E.get('WC_STEP1_MAX_BAD', 3))
 ATTEMPTS2 = int(E.get('WC_STEP2_ATTEMPTS', 2))
 T0 = int(E.get('WC_TIMEOUT_STEP0', 1800))
+# RSS watchdog: a step whose process tree (the container, lar / wire-cell / python and their
+# children) exceeds WC_STEP_MAX_RSS_GB resident is killed (rc 137, "rss" in the log).  A step-1
+# lar is ~1.6 GB and a step-2 wire-cell ~1.4 GB; on Aurora (BNB 1M, 2026-10-22) step-1 lars that
+# froze at the GDML geometry import grew to ~500 GB each, pushed the node into swap for the 4-h
+# step timeout and stalled the whole pool.  0 disables.
+MAX_RSS_GB = float(E.get('WC_STEP_MAX_RSS_GB', 48))
+RSS_POLL_S = int(E.get('WC_RSS_POLL_S', 20))
 FRAMESHIFT = E.get('WC_FRAMESHIFT', '1' if REAL == 'data' else '0') == '1'
 KEEP = E.get('WC_KEEP', 'all')
 # Provenance (sbnd-wirecell-production #1): the files this pair stands for, when RECO1/CAF are
@@ -154,8 +161,72 @@ def container(name, cmd, timeout_s, cwd=None):
     if STAMP:
         env['WCLS_INPUT_FILE'] = RECO1_ORIG
     with open(os.path.join(D, 'cost', name + '.out'), 'w') as out:
-        rc = subprocess.call([WRAP] + inner, stdout=out, stderr=subprocess.STDOUT, env=env, cwd=cwd or D)
+        p = subprocess.Popen([WRAP] + inner, stdout=out, stderr=subprocess.STDOUT, env=env, cwd=cwd or D)
+        peak = 0
+        while True:
+            try:
+                rc = p.wait(timeout=RSS_POLL_S if MAX_RSS_GB > 0 else None)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+            rss = tree_rss_kb(p.pid)
+            peak = max(peak, rss)
+            if rss > MAX_RSS_GB * 1048576:
+                log('%s: rss %.1f GB > %.0f GB limit -- killing the process tree' % (name, rss / 1048576, MAX_RSS_GB))
+                kill_tree(p.pid)
+                rc = p.wait()
+                open(os.path.join(D, 'cost', name + '.rss_killed'), 'w').write('%.1f GB\n' % (rss / 1048576))
+                rc = 137
+                break
     return rc, timefile
+
+
+def proc_table():
+    """pid -> (ppid, rss_kb) for every process, from /proc (no ps: it can take > 30 s on a busy login node)."""
+    t = {}
+    page_kb = os.sysconf('SC_PAGE_SIZE') // 1024
+    for name in os.listdir('/proc'):
+        if not name.isdigit():
+            continue
+        try:
+            with open('/proc/%s/stat' % name) as f:
+                st = f.read()
+            with open('/proc/%s/statm' % name) as f:
+                rss_pages = int(f.read().split()[1])
+        except OSError:
+            continue
+        # field 4 (ppid) comes after the ")" that closes the comm field
+        ppid = int(st[st.rindex(')') + 2:].split()[1])
+        t[int(name)] = (ppid, rss_pages * page_kb)
+    return t
+
+
+def tree_pids(root, table=None):
+    table = table if table is not None else proc_table()
+    kids = {}
+    for pid, (ppid, _) in table.items():
+        kids.setdefault(ppid, []).append(pid)
+    out, todo = [], [root]
+    while todo:
+        pid = todo.pop()
+        out.append(pid)
+        todo.extend(kids.get(pid, []))
+    return out, table
+
+
+def tree_rss_kb(root):
+    pids, table = tree_pids(root)
+    return sum(table[pid][1] for pid in pids if pid in table)
+
+
+def kill_tree(root):
+    import signal
+    pids, _ = tree_pids(root)
+    for pid in reversed(pids):      # children first
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
 
 
 def next_attempt_dir(prefix):
@@ -268,7 +339,8 @@ while slices:
         open(os.path.join(qdir, 'DONE'), 'w').write('')
         tars.append((tag, b - a, os.path.join(qdir, 'qlpctree.tar.gz')))
         continue
-    # failed or timed out (124/137): find the event it was on, keep the try, slice around it
+    # failed, timed out (124) or killed by the RSS watchdog (137): find the event it was on,
+    # keep the try, slice around it
     seen = OPHIT.findall(read_lar_log(qdir))
     order = []
     for r in seen:

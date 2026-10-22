@@ -19,8 +19,13 @@
 # pool's, so concurrent pools share one budget.
 # No launch while our RSS > WC_MEM_GUARD_GB or the machine has < WC_SYS_MIN_AVAIL_GB available,
 # or while the job's cgroup has fewer than WC_PIDS_HEADROOM (400) tasks (processes + threads)
-# left under its pids.max (Aurora PBS: 8192 per job; a step-1 lar chain is ~75 tasks, so ~100
-# units fill it and the next container launches die with "pthread_create failed"),
+# left under its pids.max (Aurora PBS: 8192 per job).  A step-1 lar is ~25 tasks for its first
+# ~90 s of setup and then jumps to 87-100 (the thread pool comes up after the geometry), so the
+# pool also counts every unit launched within the last WC_RAMP_S (180) seconds as
+# WC_TASKS_PER_UNIT (100) tasks still to come, and never runs more than
+# (pids.max - headroom) / WC_TASKS_PER_UNIT units (77 on Aurora) however high MAXPAR is.  Without
+# that, 100 units launched 2 s apart all ramped together and 221 of 800 died with
+# "pthread_create failed: Resource temporarily unavailable" (BNB 1M job 8952145, 2026-10-22).
 # or (WC_KRB_WAIT=1, FNAL) while there is no Kerberos ticket.  Running pairs are never killed.
 # Pairs whose <id>/status is OK, PARTIAL or EMPTY are skipped (WC_RETRY_PARTIAL=1 reruns PARTIAL ones);
 # a FAIL pair is rerun, reusing every finished step-1 slice and step-2 tar.
@@ -59,6 +64,21 @@ pids_left() {   # tasks left under the cgroup's pids.max; a big number when ther
   local m c; m=$(cat "$CG/pids.max" 2>/dev/null); c=$(cat "$CG/pids.current" 2>/dev/null)
   if [[ $m =~ ^[0-9]+$ ]] && [[ $c =~ ^[0-9]+$ ]]; then echo $((m - c)); else echo 999999; fi
 }
+# the units launched within the last WC_RAMP_S seconds have not spawned their threads yet
+RAMP_S=${WC_RAMP_S:-180}; TPU=${WC_TASKS_PER_UNIT:-100}; HEADROOM=${WC_PIDS_HEADROOM:-400}
+LAUNCH_TIMES=()
+n_ramping() {
+  local now t keep=() n=0; now=$(/bin/date +%s)
+  for t in "${LAUNCH_TIMES[@]}"; do if [ $((now - t)) -lt "$RAMP_S" ]; then keep+=("$t"); n=$((n+1)); fi; done
+  LAUNCH_TIMES=("${keep[@]}"); echo $n
+}
+pids_room() {   # tasks left once the ramping units and this launch have spawned their threads
+  echo $(( $(pids_left) - ($(n_ramping) + 1) * TPU ))
+}
+pids_cap() {    # the most units the cgroup can hold; a big number when there is no limit
+  local m; m=$(cat "$CG/pids.max" 2>/dev/null)
+  if [[ $m =~ ^[0-9]+$ ]]; then echo $(( (m - HEADROOM) / TPU )); else echo 999999; fi
+}
 
 nrun=0; last=""
 while IFS=$'\t' read -r id real r1 caf _rest; do
@@ -66,16 +86,17 @@ while IFS=$'\t' read -r id real r1 caf _rest; do
   st=$(cat "$WORK/$id/status" 2>/dev/null)
   [ "$st" = OK ] && continue; [[ $st == EMPTY* ]] && continue
   [ "$st" = PARTIAL ] && [ "${WC_RETRY_PARTIAL:-0}" != 1 ] && continue
-  lim=$(cur_maxpar); [ "$lim" != "$last" ] && { echo "$(/bin/date '+%F %T') concurrency limit $lim" >> "$LOG"; last=$lim; }
+  lim=$(cur_maxpar); cap=$(pids_cap); [ "$lim" -gt "$cap" ] && lim=$cap
+  [ "$lim" != "$last" ] && { echo "$(/bin/date '+%F %T') concurrency limit $lim (pids cap $cap)" >> "$LOG"; last=$lim; }
   if [ "${WC_GLOBAL:-0}" = 1 ]; then
     while [ "$(running_global)" -ge "$lim" ]; do /usr/bin/sleep 15; lim=$(cur_maxpar); done
   else
-    while [ $nrun -ge "$lim" ]; do wait -n; nrun=$((nrun-1)); lim=$(cur_maxpar); done
+    while [ $nrun -ge "$lim" ]; do wait -n; nrun=$((nrun-1)); lim=$(cur_maxpar); [ "$lim" -gt "$cap" ] && lim=$cap; done
   fi
   while [ "$(ourmem_gb)" -ge "$(cur_memguard)" ] || [ "$(sys_avail_gb)" -lt "$WC_SYS_MIN_AVAIL_GB" ]; do /usr/bin/sleep 30; done
-  if [ "$(pids_left)" -lt "${WC_PIDS_HEADROOM:-400}" ]; then
-    echo "$(/bin/date '+%F %T') pids: $(cat "$CG/pids.current") of $(cat "$CG/pids.max") tasks used, $nrun pairs running -- waiting" >> "$LOG"
-    while [ "$(pids_left)" -lt "${WC_PIDS_HEADROOM:-400}" ]; do /usr/bin/sleep 30; done
+  if [ "$(pids_room)" -lt "$HEADROOM" ]; then
+    echo "$(/bin/date '+%F %T') pids: $(cat "$CG/pids.current") of $(cat "$CG/pids.max") tasks used, $nrun pairs running, $(n_ramping) ramping -- waiting" >> "$LOG"
+    while [ "$(pids_room)" -lt "$HEADROOM" ]; do /usr/bin/sleep 15; done
   fi
   if [ "${WC_KRB_WAIT:-0}" = 1 ] && ! /usr/bin/klist -s 2>/dev/null; then
     echo "$(/bin/date '+%F %T') no valid Kerberos ticket -- waiting (kinit to resume)" >> "$LOG"
@@ -84,7 +105,7 @@ while IFS=$'\t' read -r id real r1 caf _rest; do
   rm -f "$WORK/$id/status"
   ( python3 "$BIN/run_pair.py" "$id" "$real" "$r1" "$caf" "$WORK" "$SCHEMA" > "$WORK/$id.run_pair.out" 2>&1
     echo "$(/bin/date '+%F %T') $id $(cat "$WORK/$id/status" 2>/dev/null || echo 'NO STATUS (run_pair.py did not run?)')" >> "$LOG" ) &
-  nrun=$((nrun+1))
+  nrun=$((nrun+1)); LAUNCH_TIMES+=("$(/bin/date +%s)")
   /usr/bin/sleep 2
 done < "$PAIRS"
 wait
