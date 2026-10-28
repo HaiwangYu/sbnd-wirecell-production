@@ -4,18 +4,27 @@ file: ~4 calls per reco1, ~12 h for 38k files).
 
     make-pairs-bulk.py --reco1-def <def> --caf-def <def> --relation name|sibling --reality sim|data \\
         --target-events N [--include <pairs.tsv or names>] [--seed S] -o pairs.tsv
+        [--exclude <pairs.tsv or names> ...] [--check-events [--exclude-events <events.tsv.gz> ...]]
 
 1. every reco1 location of the def: one `samweb list-file-locations`;
 2. the order: the --include files first (in the def), then the rest of the def shuffled with --seed;
+   --exclude files are then removed WITHOUT changing the order, so the same --include/--seed with
+   --exclude <an earlier production's pairs> continues that production's order (fg2 after fg1);
 3. metadata in batches of 400 (`samweb get-metadata --json`): sbn_dm.event_count and parents;
 4. the CAF:
      name     (MC)   <reco1 dir with /reco1/ -> /caf/>/reco2-<reco1 stem>.flat.caf.root, must exist;
      sibling  (data) the CAF of --caf-def made from the reco1's raw parent: its name starts with
                      reco2_<raw stem>.flat.caf (one `list-file-locations` of the CAF def);
 5. reco1 and CAF must be ONLINE in dCache;
-until the selected pairs hold --target-events events.  Writes pairs.tsv (find-pairs.py format) and
-<pairs.tsv>.skipped (reco1, reason).  Run where samweb works (SL7 + `setup sam_web_client`).
+6. --check-events: read each CAF's events (recTree rec.hdr run/subrun/evt, uproot); a pair whose
+   CAF shares an event with --exclude-events (e.g. an earlier production's event list) or with a pair
+   already selected is skipped -- run.subrun alone is NOT unique per file (filtered MC samples split
+   one generated subrun over several files);
+until the selected pairs hold --target-events events.  Writes pairs.tsv (find-pairs.py format),
+<pairs.tsv>.skipped (reco1, reason) and, with --check-events, <pairs.tsv>.events.tsv.gz (pair id, run,
+subrun, event, CAF).  Run where samweb works (SL7 + `setup sam_web_client`; uproot for --check-events).
 """
+import gzip
 import argparse
 import json
 import os
@@ -32,6 +41,9 @@ ap.add_argument('--reality', choices=['sim', 'data'], required=True)
 ap.add_argument('--target-events', type=int, required=True)
 ap.add_argument('--include', default=None, help='pairs.tsv (column 3 = reco1 path) or a list of reco1 names to take first')
 ap.add_argument('--seed', type=int, default=20261016)
+ap.add_argument('--exclude', action='append', default=[], help='pairs.tsv or a list of reco1 names to leave out (order kept)')
+ap.add_argument('--check-events', action='store_true', help='read every CAF\'s events; skip a pair sharing an event')
+ap.add_argument('--exclude-events', action='append', default=[], help='events.tsv(.gz): pair id, run, subrun, event')
 ap.add_argument('-o', '--output', required=True)
 a = ap.parse_args()
 
@@ -82,19 +94,49 @@ if a.relation == 'sibling':
             caf_by_raw.setdefault(stem, []).append(os.path.join(d, name))
     print('%s: %d CAFs indexed by raw stem' % (a.caf_def, len(caf_by_raw)), flush=True)
 
-first = []
-if a.include:
-    for line in open(a.include):
+def names(path):
+    out = []
+    for line in open(path):
         if not line.strip() or line.startswith('#'):
             continue
         p = line.rstrip('\n').split('\t')
-        n = os.path.basename(p[2] if len(p) > 2 else p[0])
+        out.append(os.path.basename(p[2] if len(p) > 2 else p[0]))
+    return out
+
+
+first = []
+if a.include:
+    for n in names(a.include):
         if n in reco1 and n not in first:
             first.append(n)
 rest = sorted(set(reco1) - set(first))
 random.Random(a.seed).shuffle(rest)
 order = first + rest
 print('order: %d included first, then %d shuffled (seed %d)' % (len(first), len(rest), a.seed), flush=True)
+excluded = set()
+for path in a.exclude:
+    excluded |= set(names(path))
+if excluded:
+    pos = [i for i, n in enumerate(order) if n in excluded]
+    print('exclude: %d files (%d of them in the def); the last excluded file is at position %d of %d' %
+          (len(excluded), len(pos), (pos[-1] + 1) if pos else 0, len(order)), flush=True)
+    order = [n for n in order if n not in excluded]
+seen_events = set()
+for path in a.exclude_events:
+    with (gzip.open(path, 'rt') if path.endswith('.gz') else open(path)) as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            p = line.split('\t')
+            seen_events.add((int(p[1]), int(p[2]), int(p[3])))
+if a.exclude_events:
+    print('exclude-events: %d events' % len(seen_events), flush=True)
+
+
+def caf_events(caf):
+    import uproot
+    t = uproot.open(caf)['recTree'].arrays(['rec.hdr.run', 'rec.hdr.subrun', 'rec.hdr.evt'], library='np')
+    return [(int(r), int(s), int(e)) for r, s, e in zip(t['rec.hdr.run'], t['rec.hdr.subrun'], t['rec.hdr.evt'])]
 
 def check(n, m):
     """-> (pair or None, reason): the CAF and the dCache checks for one reco1 (run in threads)."""
@@ -115,7 +157,13 @@ def check(n, m):
         caf = cands[0]
     if not online(r1) or not online(caf):
         return None, 'not ONLINE'
-    return (n[:-len('.root')], r1, caf, int(nev) if nev else '-'), ''
+    evs = None
+    if a.check_events:
+        try:
+            evs = caf_events(caf)
+        except Exception as x:
+            return None, 'CAF unreadable: %s' % x
+    return (n[:-len('.root')], r1, caf, int(nev) if nev else '-', evs), ''
 
 
 # the per-file NFS checks (exists, dCache locality) dominate: 32 threads; metadata in batches of 400
@@ -132,14 +180,26 @@ while total < a.target_events and k < len(order):
         if pair is None:
             skipped.append((n, why))
             continue
+        if a.check_events:
+            shared = sum(1 for e in pair[4] if e in seen_events)
+            if shared:
+                skipped.append((n, 'shares %d of its %d CAF events with an excluded or already selected pair' % (shared, len(pair[4]))))
+                continue
+            seen_events.update(pair[4])
         pairs.append(pair)
         total += pair[3] if isinstance(pair[3], int) else 0
     print('  %d / %d reco1 looked at: %d pairs, %d events, %d skipped' % (k, len(order), len(pairs), total, len(skipped)), flush=True)
 
 with open(a.output, 'w') as f:
     f.write('#id\treality\treco1\tcaf\treco1_events\n')
-    for pid, r1, caf, nev in pairs:
+    for pid, r1, caf, nev, _ in pairs:
         f.write('%s\t%s\t%s\t%s\t%s\n' % (pid, a.reality, r1, caf, nev))
+if a.check_events:
+    with gzip.open(a.output + '.events.tsv.gz', 'wt') as f:
+        f.write('#pair_id\trun\tsubrun\tevent\tcaf\n')
+        for pid, r1, caf, nev, evs in pairs:
+            for r, s, e in evs:
+                f.write('%s\t%d\t%d\t%d\t%s\n' % (pid, r, s, e, caf))
 with open(a.output + '.skipped', 'w') as f:
     for n, why in skipped:
         f.write('%s\t%s\n' % (n, why))
