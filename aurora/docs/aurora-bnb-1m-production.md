@@ -250,3 +250,30 @@ Expected rate of such pairs: with 10 event numbers per subrun and ~2.6 events pe
 - 2026-10-21 ~06:00 UTC: owner: commit and push the toolkit fix to the fork (done, d8e00500), allocation debug2 agreed, check shard03 (complete), write and test the multi-node launcher (test job submitted). Pair lists for shard03 and batch06–09 being built.
 - 2026-10-21 05:12 UTC: job 8949403 (29 min): equality test on the fixed build still PARTIAL — `WC_EVT_SUBDIR` never reached the container (`apptainer --cleanenv`; `PASS_ENV` now forwards it, `in-aurora-sl7.sh` forwards only set variables), NSKIP-CHECK PASS, r8 reference pairs OK/OK. Job 8949454 (step 2 of the multi unit again): **OK, 44/44**. Comparisons on the UAN: multi vs singles identical on every branch (section 4b); r8 reference pairs vs r8: the expected differences only. Driver changes committed (b439630). Proposal in section 4c; waiting for the owner.
 - 2026-10-21 03:40 UTC: sizing smoke jobs started on the pre-fix build (step-1 numbers unaffected; the step-2 directories collide): 8949343 `s104` (debug-scaling, 104 units of 32–41 events = 4,013 events, WC_MAXPAR 104) and 8949344 `s208` (debug, 208 units of 41–44 events = 8,854 events, WC_MAXPAR 208), both 1 node, 59 min, WC_KEEP semiprod, `node.log` sampler. Pair lists: `$Y/production-prep/bnb1m/pairs/shard01.tsv` (3,771 units, 198,803 events, 0 skipped, 29 min to build on Lustre); the other directories are being listed.
+
+## 6. Resource numbers for ALCF (written 2026-10-29 for the owner's ALCF meeting)
+
+Aurora node = 2 × Xeon Max 9470C (104 cores / 208 threads, 1.1 TB) + 6 × Intel Max 1550 GPUs; ALCF charges node-hours. The img→PR chain is CPU-only (GPUs idle).
+
+**This campaign (issue #2, 2026-10-22): 627,205 events, 11,888 units**
+
+| quantity | value | note |
+|---|---|---|
+| node-hours charged | **190.6** | run 1 128.5 (8 h × 16 nodes, 9 nodes stalled), run 2 62.0, tail 0.1; debug2 |
+| CPU core-hours actually used | ~6,300 | 36.3 CPU-s/event (step 1 31.1, step 2 4.3, merge+validate 0.9) × 627k |
+| GPU-hours | 0 used | 1,144 GPU-hours (190.6 × 6) idle but charged with the nodes |
+| node-hours at the healthy rate | ~85 | 7,000–8,000 events/node-hour; the stalls doubled the bill |
+| wall | 13.3 h on 16 nodes | capacity queue, two 8-node jobs; queue waits 0.5–3 h |
+| output disk (kept) | **1.78 TB** | 2.9 MB/event at semiprod; merged CAFs 386 GB of it; step-1 tars (8.4 MB/event, 5.3 TB) deleted after use |
+| input disk (Avinay's reco1 + CAF) | ~14 TB | reco1 58.8 MB/file ≈ 22 MB/event; CAF 0.5 MB/event |
+
+**Anticipated: ~10 such campaigns in the next 6 months, 1M events each, keeping the latest 2**
+
+| quantity | per campaign (1M events) | 10 campaigns | note |
+|---|---|---|---|
+| node-hours | 150–200 (plan 200) | **1,500–2,000; request 3,000** | 135 at 7,500 events/node-hour + ramps/tails/reruns; 3,000 covers one bad campaign like this one (300 per 1M) |
+| CPU core-hours used | ~10,000 | ~100,000 | 36 CPU-s/event |
+| GPU-hours | 0 | 0 | CPU-only; a CPU-only or CPU-priced partition would suit this workload |
+| wall | 10–14 h on 16 nodes | | 32 nodes (2 jobs × 16) halves it |
+| output disk | 2.9 TB (semiprod) | **6 TB** for the latest 2 | +8.4 TB per campaign transiently if step-1 tars are kept (`WC_KEEP=all`); 11 TB per campaign full keep |
+| input disk | 22 TB reco1 + 0.5 TB CAF | 45 TB for the latest 2 | only if the inputs also live on Flare |
