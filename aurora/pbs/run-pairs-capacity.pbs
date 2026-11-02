@@ -1,6 +1,7 @@
 #!/bin/bash
 #PBS -N sbnd-wc-prod
-#PBS -A neutrinoGPU::debug2
+#PBS -A neutrinoGPU
+# (allocation 17779, 2026-11-01..2027-07-01, one unrestricted suballocation; debug2 ended 2026-11-01)
 #PBS -q capacity
 #PBS -l select=8
 #PBS -l walltime=06:00:00

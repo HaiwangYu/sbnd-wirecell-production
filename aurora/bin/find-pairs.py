@@ -7,8 +7,10 @@
     find-pairs.py --reco1-names names.txt --caf-samdef <flatcaf def> --reality data -o pairs.tsv
     # --caf-relation sibling: the CAF was made from the raw file in one job (decode -> reco1 -> reco2 ->
     # caf), so it is the reco1's SIBLING through their common raw parent (MCP2025C and gen2 InTime data)
-    # by path: list or directory of reco1 files, CAFs found by name in a directory tree
-    find-pairs.py --reco1-dir <dir> | --reco1-list <file> --caf-dir <dir> --reality sim [--limit N] -o pairs.tsv
+    # by path: list or directory of reco1 files, CAFs found by name in a directory tree or a list
+    # (--caf-list: e.g. a producer's validated-file lists, nueCC / NC delta-rad on Aurora); the events
+    # column comes from the reco1 sidecar <reco1>.json "event_count" when there is one
+    find-pairs.py --reco1-dir <dir> | --reco1-list <file> --caf-dir <dir> | --caf-list <file> --reality sim [--limit N] -o pairs.tsv
     # by CAF sidecar (gen2 BNB 1M on Aurora: one flat CAF per 20 reco1, named after ONE of them):
     # every <caf>.json "parents" (reco2-X.root) -> reco1 X.root found by name under --reco1-tree
     # (default <caf dir>/../reco1); the unit is the CAF + all its parents, comma-separated in the
@@ -42,6 +44,7 @@ ap.add_argument('--caf-relation', choices=['child', 'sibling'], default='child',
                 help='child: the CAF is a child of the reco1; sibling: both are children of one raw file')
 ap.add_argument('--caf-samdef', help='SAM definition the CAF must belong to (SAM mode; a reco1 has several CAF-like children)')
 ap.add_argument('--caf-dir', help='directory tree holding the CAFs (path mode)')
+ap.add_argument('--caf-list', help='file listing the CAF paths, one per line (path mode)')
 ap.add_argument('--reality', required=True, choices=['sim', 'data'])
 ap.add_argument('--limit', type=int, default=0)
 ap.add_argument('--offset', type=int, default=0)
@@ -159,17 +162,23 @@ elif a.caf_sidecar_dir:
         stem = stem[:-len('.flat.caf.root')] if stem.endswith('.flat.caf.root') else stem[:-len('.caf.root')]
         pairs.append((stem, ','.join(r1s), cf, nev if nev is not None else '-'))
 else:
-    if not a.caf_dir:
-        sys.exit('--caf-dir is required in path mode')
+    if not a.caf_dir and not a.caf_list:
+        sys.exit('--caf-dir or --caf-list is required in path mode')
     if a.reco1_dir:
         reco1s = [os.path.join(dp, f) for dp, _, fs in os.walk(a.reco1_dir) for f in fs if f.endswith('.root')]
     else:
         reco1s = [l.strip() for l in open(a.reco1_list) if l.strip() and not l.startswith('#')]
     reco1s = sorted(reco1s, key=os.path.basename)[a.offset:]
     cafs = {}
-    for dp, _, fs in os.walk(a.caf_dir):
-        for f in fs:
-            cafs.setdefault(f, []).append(os.path.join(dp, f))
+    if a.caf_list:
+        for l in open(a.caf_list):
+            l = l.strip()
+            if l and not l.startswith('#'):
+                cafs.setdefault(os.path.basename(l), []).append(l)
+    else:
+        for dp, _, fs in os.walk(a.caf_dir):
+            for f in fs:
+                cafs.setdefault(f, []).append(os.path.join(dp, f))
     for r1 in reco1s:
         if a.limit and len(pairs) >= a.limit:
             break
@@ -177,7 +186,12 @@ else:
         if len(hits) != 1:
             skipped.append((r1, '%d CAFs by name' % len(hits)))
             continue
-        pairs.append((os.path.basename(r1)[:-len('.root')], r1, hits[0], '-'))
+        nev = '-'
+        try:
+            nev = int(json.load(open(r1 + '.json'))['event_count'])
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        pairs.append((os.path.basename(r1)[:-len('.root')], r1, hits[0], nev))
 
 with open(a.output, 'w') as f:
     f.write('#id\treality\treco1\tcaf\treco1_events\n')

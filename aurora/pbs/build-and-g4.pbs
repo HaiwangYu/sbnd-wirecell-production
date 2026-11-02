@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N wc-build-g4
-#PBS -A neutrinoGPU::debug2
+#PBS -A neutrinoGPU
 #PBS -q debug
 #PBS -l select=1
 #PBS -l walltime=00:59:00

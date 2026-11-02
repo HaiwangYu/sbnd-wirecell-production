@@ -26,6 +26,9 @@
 # (pids.max - headroom) / WC_TASKS_PER_UNIT units (77 on Aurora) however high MAXPAR is.  Without
 # that, 100 units launched 2 s apart all ramped together and 221 of 800 died with
 # "pthread_create failed: Resource temporarily unavailable" (BNB 1M job 8952145, 2026-10-22).
+# With short units (1-4 events, ~2-4 min: nueCC / NC delta-rad) every running unit is inside the
+# ramp window and the ramp term would halve the concurrency; there WC_RAMP_S=0 leaves the cap
+# alone to hold the total (77 x 100 tasks).  Launches are WC_LAUNCH_GAP_S (2) seconds apart.
 # or (WC_KRB_WAIT=1, FNAL) while there is no Kerberos ticket.  Running pairs are never killed.
 # Pairs whose <id>/status is OK, PARTIAL or EMPTY are skipped (WC_RETRY_PARTIAL=1 reruns PARTIAL ones);
 # a FAIL pair is rerun, reusing every finished step-1 slice and step-2 tar.
@@ -106,7 +109,7 @@ while IFS=$'\t' read -r id real r1 caf _rest; do
   ( python3 "$BIN/run_pair.py" "$id" "$real" "$r1" "$caf" "$WORK" "$SCHEMA" > "$WORK/$id.run_pair.out" 2>&1
     echo "$(/bin/date '+%F %T') $id $(cat "$WORK/$id/status" 2>/dev/null || echo 'NO STATUS (run_pair.py did not run?)')" >> "$LOG" ) &
   nrun=$((nrun+1)); LAUNCH_TIMES+=("$(/bin/date +%s)")
-  /usr/bin/sleep 2
+  /usr/bin/sleep "${WC_LAUNCH_GAP_S:-2}"
 done < "$PAIRS"
 wait
 echo "$(/bin/date '+%F %T') pool done: $(cat "$WORK"/*/status 2>/dev/null | grep -cx OK) OK, $(cat "$WORK"/*/status 2>/dev/null | grep -cx PARTIAL) PARTIAL, $(cat "$WORK"/*/status 2>/dev/null | grep -c '^EMPTY') EMPTY, $(cat "$WORK"/*/status 2>/dev/null | grep -c '^FAIL') FAIL" >> "$LOG"
