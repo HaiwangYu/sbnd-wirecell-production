@@ -94,7 +94,7 @@ Disk (smoke work dirs at semiprod, `du`): nueCC 22.5 GB for ~4,600 events = **~4
 - `pbs/*.pbs`: `#PBS -A neutrinoGPU` (17779) instead of `neutrinoGPU::debug2`.
 - `$Y/production-prep/rare/sidecar-sweep.py`: the inventory of both samples from the sidecars (`{nuecc,ncdr}/inventory.tsv`: id, reco1 events, reco1 MB, CAF MB).
 
-## 5. Proposed running plan (2026-11-02 08:00 UTC; waits for the owner's approval)
+## 5. Running plan (proposed 2026-11-02 08:00 UTC; approved by the owner 2026-11-02 13:50 UTC: run as planned, nueCC first, optimise after this campaign)
 
 **Unit and settings (as confirmed in 9032035):** unit = 1 reco1 + 1 flat CAF from the validated lists (`find-pairs.py --reco1-list/--caf-list`; `$Y/production-prep/rare/{nuecc,ncdr}/full/pairs-all.tsv`); `WC_KEEP=semiprod`; `WC_MAXPAR=100` (-> the pids cap of 77 per node); `WC_RAMP_S=0`; `WC_LAUNCH_GAP_S=1`; `WC_TRUST_EVENTS=1`; the run/subrun/event layout (default now); the RSS watchdog at 48 GB; toolkit pin d06a47d7, `$OPT` unchanged; allocation 17779 (`-A neutrinoGPU`).
 
@@ -111,6 +111,8 @@ Disk (smoke work dirs at semiprod, `du`): nueCC 22.5 GB for ~4,600 events = **~4
 **Questions for the owner:** (1) approve the three jobs above as written? (2) output location: `$Y/production-prep/rare/...` as for the BNB, or elsewhere? (3) order: nueCC first (both slots), or NC first (smaller, the training sample)? (4) do the multi-pair / single-container optimisations now, after this campaign, or not at all?
 
 ## 6. Log
+
+- 2026-11-02 13:54 UTC: the owner approved the plan as written (section 5): run as planned, nueCC first in both running slots, the multi-pair / single-container optimisation after this campaign. Submitted in capacity, `-A neutrinoGPU`, 8 nodes x 8 h each, `WC_MAXPAR=100 WC_RAMP_S=0 WC_LAUNCH_GAP_S=1 WC_KEEP=semiprod WC_TRUST_EVENTS=1`: **9032475** `wc-nuecc-A` (`nuecc/full/pairs-A.tsv`, 31,025 units / 134,208 events -> `nuecc/full/A/`) and **9032476** `wc-nuecc-B` (`pairs-B.tsv`, 31,025 / 134,657 -> `nuecc/full/B/`). The NC job (`wc-ncdr`, 8 x 4 h, `ncdr/full/pairs-all.tsv` -> `ncdr/full/work/`) is queued by `production-prep/rare/watch-full.sh submit-nc` once both nueCC jobs are running, so it takes the first slot that frees up (2 running jobs per user). Job ids in `production-prep/rare/jobs.txt`.
 
 - 2026-11-02 07:45 UTC: confirmation job 9032035 done (43 min): 418 OK / 87 EMPTY / 0 PARTIAL / 0 FAIL; the 53 collision units OK; trusted counts on all units. Full pair lists being built. Plan (section 5) to the owner.
 
