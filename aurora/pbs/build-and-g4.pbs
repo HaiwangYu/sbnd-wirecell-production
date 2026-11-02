@@ -34,6 +34,7 @@ echo "respond_to_open_input_file $(nm -DC $L/libWireCellLarsoft.so | grep -c res
 echo "prong_trackid $(strings $L/libWireCellAIML.so | grep -c prong_trackid)"
 echo "=== G4 $(date): the r8 reference pairs, WC_KEEP=validation"
 cd "$REPO"; export WC_KEEP=validation
+export WC_EVT_SUBDIR='pr_evt{ident}'   # the r8 reference layout (the production default is run/subrun/event)
 bash bin/run-pairs.sh site/aurora.sh "$PAIRS" "$WORK"
 echo "=== $(date) done"; cat "$WORK/pool.log" | tail -5; cat "$WORK/cost-summary.md"; for d in "$WORK"/*/; do [ -f "$d/status" ] && echo "$(basename $d): $(cat $d/status) validate=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('verdict', json.load(open(sys.argv[1])).get('status','?')))" $d/validate.json 2>/dev/null) dl_fail=$(cat $d/pr/*/dl_fail 2>/dev/null | tr '\n' ' ')"; done
 echo "=== END $(date)"

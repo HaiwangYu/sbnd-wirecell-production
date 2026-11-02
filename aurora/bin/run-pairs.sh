@@ -84,7 +84,7 @@ pids_cap() {    # the most units the cgroup can hold; a big number when there is
 }
 
 nrun=0; last=""
-while IFS=$'\t' read -r id real r1 caf _rest; do
+while IFS=$'\t' read -r id real r1 caf nev _rest; do
   [ -z "$id" ] && continue; [[ $id == \#* ]] && continue
   st=$(cat "$WORK/$id/status" 2>/dev/null)
   [ "$st" = OK ] && continue; [[ $st == EMPTY* ]] && continue
@@ -106,7 +106,7 @@ while IFS=$'\t' read -r id real r1 caf _rest; do
     until /usr/bin/klist -s 2>/dev/null; do /usr/bin/sleep 60; done
   fi
   rm -f "$WORK/$id/status"
-  ( python3 "$BIN/run_pair.py" "$id" "$real" "$r1" "$caf" "$WORK" "$SCHEMA" > "$WORK/$id.run_pair.out" 2>&1
+  ( WC_PAIR_EVENTS="${nev:-}" python3 "$BIN/run_pair.py" "$id" "$real" "$r1" "$caf" "$WORK" "$SCHEMA" > "$WORK/$id.run_pair.out" 2>&1
     echo "$(/bin/date '+%F %T') $id $(cat "$WORK/$id/status" 2>/dev/null || echo 'NO STATUS (run_pair.py did not run?)')" >> "$LOG" ) &
   nrun=$((nrun+1)); LAUNCH_TIMES+=("$(/bin/date +%s)")
   /usr/bin/sleep "${WC_LAUNCH_GAP_S:-2}"

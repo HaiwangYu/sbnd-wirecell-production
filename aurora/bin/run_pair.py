@@ -90,10 +90,13 @@ KEEP = E.get('WC_KEEP', 'all')
 RECO1_ORIG = E.get('WC_RECO1_ORIG', RECO1)
 CAF_ORIG = E.get('WC_CAF_ORIG', CAF)
 STAMP = E.get('WC_STAMP_INPUT_FILE', '0') == '1'
-# Multi-reco1 units: the event numbers of the 20 subruns collide (1..10 each), so step 2 names
-# its per-event directories by run/subrun/event (toolkit per_event_name tokens) instead of the
-# event number; single-file units keep the r8 layout pr_evt<event>.
-if len(RECO1S) > 1 and 'WC_EVT_SUBDIR' not in E:
+# Step 2 names its per-event directories by run/subrun/event (toolkit per_event_name tokens),
+# never by the event number alone: in every gen2 sample the event numbers restart per subrun, so
+# a file with events from several subruns repeats them (the BNB 1M units of 20 subruns, and 5 %
+# of the single-file nueCC units: subrun 43 event 50 + subrun 87 event 50 -> one pr_evt50, one
+# event lost, issue #3).  WC_EVT_SUBDIR=pr_evt{ident} restores the r8 layout (pbs/build-and-g4.pbs
+# sets it for the reference comparison).
+if 'WC_EVT_SUBDIR' not in E:
     os.environ['WC_EVT_SUBDIR'] = 'pr_evt{run}_{subrun}_{event}'
 if STAMP and len(RECO1S) > 1 and 'WC_RECO1_ORIG' not in E:
     sys.exit('run_pair.py: WC_STAMP_INPUT_FILE=1 needs WC_RECO1_ORIG with a multi-reco1 unit (one name for all files?)')
@@ -303,6 +306,16 @@ def step1_input():
 
 # ---------------------------------------------------------------- step 1 (fixes 2, 4, 5)
 nfile = os.path.join(D, 'reco1_events')
+# WC_TRUST_EVENTS=1: a single-file unit takes its event count from the pair list (WC_PAIR_EVENTS,
+# the reco1 sidecar's event_count via find-pairs.py) instead of counting inside a container --
+# under 77 concurrent container starts that count took 48 s (+ ~30 s of start-up) per unit, the
+# whole cost of an EMPTY unit (issue #3).  A multi-file unit still counts (per-file split needed).
+if (not os.path.exists(nfile) and E.get('WC_TRUST_EVENTS', '0') == '1' and len(RECO1S) == 1
+        and E.get('WC_PAIR_EVENTS', '').isdigit()):
+    with open(os.path.join(D, 'reco1_files.json'), 'w') as f:
+        json.dump([{'reco1': RECO1S[0], 'events': int(E['WC_PAIR_EVENTS'])}], f, indent=1)
+    open(nfile, 'w').write('%s\n' % E['WC_PAIR_EVENTS'])
+    log('events from the pair list (WC_TRUST_EVENTS): %s' % E['WC_PAIR_EVENTS'])
 if not os.path.exists(nfile) or not os.path.exists(os.path.join(D, 'reco1_files.json')):
     rc, _ = container('count-events', ['python3', os.path.join(BIN, 'count-events.py')] + RECO1S, 600)
     try:

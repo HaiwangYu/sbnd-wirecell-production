@@ -45,7 +45,45 @@ Why `WC_RAMP_S=0`: the pool counts every unit launched in the last `WC_RAMP_S` (
 
 What the smoke must tell us: (a) step 1 reads `v10_14_02_05` reco1 (status OK, `validate.json` PASS, `dl_fail` 0); (b) the per-unit wall and CPU with 1-4 events per `lar` -> the cost per event and the node-hours for 62k + 30k units; (c) whether 1-s launches of apptainer hold on a node (the container start reads the `.sif` from Flare); (d) the step-2 crash rate on nueCC (FNAL: ~1 per 550 events, retried once; a deterministic one leaves the event out -> PARTIAL); (e) RSS per step (the watchdog at 48 GB stays on; the BNB `ClusteringDeghost` hog was on 0-nu events).
 
+### 3a. Smoke results (both jobs ran to their walltime, 2026-11-02 04:32-06:41 UTC)
+
+| | nueCC (9031754: 44 min queue, 04:54-06:41, killed at 1:45) | NC delta-rad (9031755: 22 min queue, 04:32-05:33, killed at 1:00) |
+|---|---|---|
+| finished / in flight / not started | 1,051 / 77 / 113 of 1,241 | 930 / 77 / 185 of 1,192 |
+| OK / PARTIAL / EMPTY / FAIL | 990 / **53** / 8 / 0 | 542 / 4 / 384 / 0 |
+| throughput per node | **593 units/h, 2,568 events/h** | 923 units/h, 795 events/h |
+| unit wall (fit over the OK/PARTIAL units) | **156 s + 67 s x events**; median 406 s at 4 events | 381 s + 36 s x events; 1-event units 395 s, EMPTY units 53 s |
+| step 1 | 33 s + 36 s x events; 40 s wall / 39 s CPU per event; RSS 1.5 GB (max 2.8) | a 1-event unit: 267 s wall / 82 s CPU; RSS 1.5 GB (max 2.5) |
+| step 2 / 3 / validate per event | 26 s / 1.2 s / 2.6 s; RSS 1.3 GB (max 3.0) | 26 s / 8 s / 10 s |
+| precheck container (`count-events`) | 4.7 s median, 48 s max | 9.4 s median, 48 s max |
+| outside any container per unit (apptainer start + UPS setup, 5 containers) | 94 s | 270 s |
+| node | our RSS 114 GB, load 82, pids 6,542 of 8,192; 77 lar | 111 GB, 83, 7,589; 77 lar |
+| watchdog kills | 0 | 0 |
+| step-2 crashes | 12 x rc 139 (1 per 450 events; 11 recovered on the retry, 1 died again rc 134 -> PARTIAL) + 1 incomplete file | 0 |
+
+The step-1 reads of `v10_14_02_05` reco1 work (status OK, dl_fail 0 everywhere). The ramp-free guard (`WC_RAMP_S=0`) and the 1-s launch gap held: 77 units per node, pids <= 7,589, 0 pthread failures.
+
+**Finding 1 -- 51 of the 53 nueCC PARTIALs and all 4 NC ones are the event-number collision.** Each has exactly one CAF event without Wire-Cell output and no failure anywhere: e.g. unit `00b3-84d7` holds subrun 43 event 50 and subrun 87 event 50, step 2 wrote both to `pr_evt50` and the second overwrote the first. Single-file units kept the r8 layout `pr_evt<event>`; the event numbers restart per subrun in every gen2 sample, and a file of ~5 events from up to 51 subruns repeats one ~5 % of the time (the 20-subrun BNB units had the same problem and already used the run/subrun/event layout). Fix: `run_pair.py` now defaults every unit to `WC_EVT_SUBDIR=pr_evt{run}_{subrun}_{event}`; `pbs/build-and-g4.pbs` sets `pr_evt{ident}` so the G4 comparison with r8 keeps its layout (`compare-outputs.py` keys on the directory name).
+
+**Finding 2 -- the cost is the start-ups, not the events.** A unit runs 5 containers (precheck, step 1, step 2, merge, validate), each paying apptainer + the UPS `setup` (~20-50 s under load) and then its own program start-up: a step-1 `lar` took **277 s to reach its first event** (`lar.log`: container start 04:33:39, first `OpHitSource` 04:38:16) against ~90 s in the BNB run, because 77 lars per node now start every few minutes and contend for the same library / fcl / geometry / model loads from Flare (CPU 82 s of a 267 s step). The BNB units amortised one start-up over 53 events; here it is over 4.3 (nueCC) or 0.9 (NC). Per event that is 40 s of step-1 compute plus ~110 s of start-ups.
+
+**At the smoke rates the full samples cost:** nueCC 62,050 / 593 = **105 node-hours**, NC 29,779 / 923 = **32 node-hours**; 137 in all (235,000 available). Cheap reductions, applied for the confirmation job: (a) `WC_TRUST_EVENTS=1`: the event count comes from the pair list (the sidecar) instead of a container -- one container start less per unit, and an EMPTY unit (12,175 of the NC units) costs nothing; (b) nothing else. Expected ~75 + ~22 = ~100 node-hours. Bigger reductions need design work and are the owner's call (section 6).
+
+**Inventory of the full samples** (`sidecar-sweep.py`, 2 h on the UAN):
+
+| | units | events | empty units | events per unit | reco1 on disk | flat CAFs on disk |
+|---|---|---|---|---|---|---|
+| nueCC | 62,050 | 268,865 | 798 | 0: 798, 1: 3,539, 2: 7,704, 3: 11,016, 4: 11,903, 5: 10,320, 6: 7,577, 7: 4,628, 8: 2,538, 9: 1,230, 10-15: 797 | 6.66 TB (107 MB per file) | 0.29 TB (4.7 MB) |
+| NC delta-rad | 29,779 | 26,745 | 12,175 | 0: 12,175, 1: 10,889, 2: 4,814, 3: 1,473, 4-7: 428 | 0.67 TB (22.5 MB) | 0.07 TB (2.4 MB) |
+
+### 3b. Confirmation job 9032035 (debug, 1 node, 59 min; submitted 06:57 UTC)
+
+505 units / 1,541 events / 87 empty into `$Y/production-prep/rare/confirm/work`: the 53 PARTIAL nueCC units (must come out OK with the run/subrun/event layout), 200 unrun nueCC units and 300 unrun NC units (the cost without the precheck container, `WC_TRUST_EVENTS=1`); otherwise the smoke settings.
+
 ## 4. Workflow changes for this campaign (this repo)
+
+- `bin/run_pair.py`: the per-event directory layout `pr_evt{run}_{subrun}_{event}` is the default for every unit (finding 1); `WC_TRUST_EVENTS=1` takes a single-file unit's event count from the pair list (`WC_PAIR_EVENTS`, exported by `run-pairs.sh` from the 5th column) instead of the precheck container.
+- `pbs/build-and-g4.pbs`: `WC_EVT_SUBDIR=pr_evt{ident}` for the r8 comparison.
 
 - `bin/find-pairs.py`: path mode takes `--caf-list <file>` as well as `--caf-dir`, and fills the events column from `<reco1>.json` `event_count` when there is a sidecar.
 - `bin/run-pairs.sh`: `WC_LAUNCH_GAP_S` (default 2) = the seconds between launches; the header explains `WC_RAMP_S=0` for short units.
@@ -54,4 +92,5 @@ What the smoke must tell us: (a) step 1 reads `v10_14_02_05` reco1 (status OK, `
 
 ## 5. Log
 
+- 2026-11-02 07:00 UTC: both smokes ran to their walltime: nueCC 593 units/h/node (2,568 events/h), NC 923 units/h (795 events/h): the start-ups dominate (3a). 51 + 4 PARTIALs are the event-number collision in the single-file layout -> run/subrun/event layout for every unit; `WC_TRUST_EVENTS=1` drops the precheck container. Confirmation job 9032035 (debug) queued with both; the plan (section 6) goes to the owner after it.
 - 2026-11-02 04:10 UTC: samples inspected (1:1 pairing, small units), allocation found (17779), workflow changes above, smoke lists built (29 s each from the lists), smoke jobs 9031754 (nueCC) and 9031755 (NC) queued in capacity; issue #3 opened. Sidecar inventory of both full samples running on the UAN.
