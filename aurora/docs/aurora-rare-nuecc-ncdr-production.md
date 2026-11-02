@@ -67,7 +67,7 @@ The step-1 reads of `v10_14_02_05` reco1 work (status OK, dl_fail 0 everywhere).
 
 **Finding 2 -- the cost is the start-ups, not the events.** A unit runs 5 containers (precheck, step 1, step 2, merge, validate), each paying apptainer + the UPS `setup` (~20-50 s under load) and then its own program start-up: a step-1 `lar` took **277 s to reach its first event** (`lar.log`: container start 04:33:39, first `OpHitSource` 04:38:16) against ~90 s in the BNB run, because 77 lars per node now start every few minutes and contend for the same library / fcl / geometry / model loads from Flare (CPU 82 s of a 267 s step). The BNB units amortised one start-up over 53 events; here it is over 4.3 (nueCC) or 0.9 (NC). Per event that is 40 s of step-1 compute plus ~110 s of start-ups.
 
-**At the smoke rates the full samples cost:** nueCC 62,050 / 593 = **105 node-hours**, NC 29,779 / 923 = **32 node-hours**; 137 in all (235,000 available). Cheap reductions, applied for the confirmation job: (a) `WC_TRUST_EVENTS=1`: the event count comes from the pair list (the sidecar) instead of a container -- one container start less per unit, and an EMPTY unit (12,175 of the NC units) costs nothing; (b) nothing else. Expected ~75 + ~22 = ~100 node-hours. Bigger reductions need design work and are the owner's call (section 6).
+**At the smoke rates the full samples cost:** nueCC 62,050 / 593 = **105 node-hours**, NC 29,779 / 923 = **32 node-hours**; 137 in all (235,000 available). Cheap reductions, applied for the confirmation job: (a) `WC_TRUST_EVENTS=1`: the event count comes from the pair list (the sidecar) instead of a container -- one container start less per unit, and an EMPTY unit (12,175 of the NC units) costs nothing; (b) nothing else. Expected ~75 + ~22 = ~100 node-hours. Bigger reductions need design work and are the owner's call (section 5).
 
 **Inventory of the full samples** (`sidecar-sweep.py`, 2 h on the UAN):
 
@@ -80,6 +80,10 @@ The step-1 reads of `v10_14_02_05` reco1 work (status OK, dl_fail 0 everywhere).
 
 505 units / 1,541 events / 87 empty into `$Y/production-prep/rare/confirm/work`: the 53 PARTIAL nueCC units (must come out OK with the run/subrun/event layout), 200 unrun nueCC units and 300 unrun NC units (the cost without the precheck container, `WC_TRUST_EVENTS=1`); otherwise the smoke settings.
 
+**Result (07:01-07:44 UTC, 43 min, 1-min queue):** 418 OK / 87 EMPTY / **0 PARTIAL / 0 FAIL**. All 53 collision units are OK with the run/subrun/event layout; all 505 units took their event count from the pair list (the 87 EMPTY ones finished in 0 s); 3 step-2 segfaults (2 x rc 139, 1 x rc 134), all recovered on the retry. Rate: 704 units/h = 2,144 events/h on the node, with a heavier event mix (3.7 events per non-empty unit) -- unit wall 153 s + 77 s x events, step 1 48 s wall / 42 s CPU per event, step 2 24 s, so dropping the precheck container did not lower the unit cost measurably: the start-up contention sets it. **Planning rates: nueCC 600 units per node-hour, NC 900 non-empty units per node-hour, EMPTY free.**
+
+Disk (smoke work dirs at semiprod, `du`): nueCC 22.5 GB for ~4,600 events = **~4.5 MB per event** (merged CAFs 5.6 MB each); NC 4.9 GB. Full samples: nueCC ~1.1 TB (merged CAFs 0.35 TB), NC ~0.13 TB (0.06 TB) -> **~1.3 TB**.
+
 ## 4. Workflow changes for this campaign (this repo)
 
 - `bin/run_pair.py`: the per-event directory layout `pr_evt{run}_{subrun}_{event}` is the default for every unit (finding 1); `WC_TRUST_EVENTS=1` takes a single-file unit's event count from the pair list (`WC_PAIR_EVENTS`, exported by `run-pairs.sh` from the 5th column) instead of the precheck container.
@@ -90,7 +94,25 @@ The step-1 reads of `v10_14_02_05` reco1 work (status OK, dl_fail 0 everywhere).
 - `pbs/*.pbs`: `#PBS -A neutrinoGPU` (17779) instead of `neutrinoGPU::debug2`.
 - `$Y/production-prep/rare/sidecar-sweep.py`: the inventory of both samples from the sidecars (`{nuecc,ncdr}/inventory.tsv`: id, reco1 events, reco1 MB, CAF MB).
 
-## 5. Log
+## 5. Proposed running plan (2026-11-02 08:00 UTC; waits for the owner's approval)
+
+**Unit and settings (as confirmed in 9032035):** unit = 1 reco1 + 1 flat CAF from the validated lists (`find-pairs.py --reco1-list/--caf-list`; `$Y/production-prep/rare/{nuecc,ncdr}/full/pairs-all.tsv`); `WC_KEEP=semiprod`; `WC_MAXPAR=100` (-> the pids cap of 77 per node); `WC_RAMP_S=0`; `WC_LAUNCH_GAP_S=1`; `WC_TRUST_EVENTS=1`; the run/subrun/event layout (default now); the RSS watchdog at 48 GB; toolkit pin d06a47d7, `$OPT` unchanged; allocation 17779 (`-A neutrinoGPU`).
+
+| job | pairs | nodes x walltime | expected | node-hours |
+|---|---|---|---|---|
+| nueCC-A | `pairs-A.tsv`, 31,025 units (every other line) | 8 x 8 h, capacity | 3,878 units per node at 600/h = 6.5 h | ~52 |
+| nueCC-B | `pairs-B.tsv`, 31,025 units | 8 x 8 h, capacity | same | ~52 |
+| NC | `pairs-all.tsv`, 29,779 units (12,175 empty) | 8 x 4 h, capacity | 2,200 non-empty units per node at 900/h = 2.5 h | ~20 |
+
+~125 node-hours in all (plan **150**); ~1.3 TB of output under `$Y/production-prep/rare/{nuecc,ncdr}/full/{A,B}/node<k>/<unit>/merged/*.wc.flat.caf.root`; 1-3 h of queue wait per job (the capacity queue allows 2 running jobs per user, so NC starts when one nueCC job ends; it could instead go first). Resume as in the BNB run: resubmit with the same PAIRS/WORK and node count. Expected PARTIALs: the step-2 segfault runs at ~1 per 400 nueCC events and the retry recovers ~90 %, so ~70 nueCC units should end PARTIAL with one event each (listed in `events.json`, reported at the end); a `ClusteringDeghost` hog would be killed by the watchdog and the event skipped, as in the BNB run.
+
+**Not in the plan, for the owner to decide (each would cut the cost ~3x, from ~125 to ~45 node-hours, and the wall accordingly, at a day or two of work plus a validation):** (a) *multi-pair units* -- N reco1 files through one `lar` and one step 2 (already supported), then one merge + validate per CAF (not yet: `run_pair.py` takes one CAF); (b) one container per unit instead of five, or a cached UPS environment. With 235,000 node-hours on the allocation the plain run is affordable; the optimisations matter if the ~10 campaigns of the next half-year look like these samples (small files) rather than like the BNB (20 files per CAF).
+
+**Questions for the owner:** (1) approve the three jobs above as written? (2) output location: `$Y/production-prep/rare/...` as for the BNB, or elsewhere? (3) order: nueCC first (both slots), or NC first (smaller, the training sample)? (4) do the multi-pair / single-container optimisations now, after this campaign, or not at all?
+
+## 6. Log
+
+- 2026-11-02 07:45 UTC: confirmation job 9032035 done (43 min): 418 OK / 87 EMPTY / 0 PARTIAL / 0 FAIL; the 53 collision units OK; trusted counts on all units. Full pair lists being built. Plan (section 5) to the owner.
 
 - 2026-11-02 07:00 UTC: both smokes ran to their walltime: nueCC 593 units/h/node (2,568 events/h), NC 923 units/h (795 events/h): the start-ups dominate (3a). 51 + 4 PARTIALs are the event-number collision in the single-file layout -> run/subrun/event layout for every unit; `WC_TRUST_EVENTS=1` drops the precheck container. Confirmation job 9032035 (debug) queued with both; the plan (section 6) goes to the owner after it.
 - 2026-11-02 04:10 UTC: samples inspected (1:1 pairing, small units), allocation found (17779), workflow changes above, smoke lists built (29 s each from the lists), smoke jobs 9031754 (nueCC) and 9031755 (NC) queued in capacity; issue #3 opened. Sidecar inventory of both full samples running on the UAN.
