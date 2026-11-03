@@ -110,7 +110,45 @@ Disk (smoke work dirs at semiprod, `du`): nueCC 22.5 GB for ~4,600 events = **~4
 
 **Questions for the owner:** (1) approve the three jobs above as written? (2) output location: `$Y/production-prep/rare/...` as for the BNB, or elsewhere? (3) order: nueCC first (both slots), or NC first (smaller, the training sample)? (4) do the multi-pair / single-container optimisations now, after this campaign, or not at all?
 
+## 7. Results (campaign complete 2026-11-03 00:30 UTC)
+
+All three jobs ran to completion inside their walltimes (exit 0), ~129 node-hours in all (plan: 150). No resubmission was needed.
+
+| job | ran (UTC) | wall x nodes | OK | EMPTY | PARTIAL | FAIL | events with Wire-Cell output | units / node-h |
+|---|---|---|---|---|---|---|---|---|
+| 9032475 wc-nuecc-A | 11-02 14:28 - 20:44 | 6.26 h x 8 | 30,596 | 392 | 33 | 4 | 134,119 / 134,208 | 691 |
+| 9032476 wc-nuecc-B | 11-02 14:38 - 21:04 | 6.41 h x 8 | 30,563 | 406 | 50 | 6 | 134,500 / 134,657 | 675 |
+| 9032556 wc-ncdr | 11-02 21:00 - 11-03 00:30 | 3.48 h x 8 | 17,603 | 12,175 | 0 | 1 | 26,744 / 26,745 | 1,255 |
+
+nueCC: **268,619 of 268,865 events** have Wire-Cell output (246 lost, 0.09 %); NC: **26,744 of 26,745** (1 lost). Every `validate.json` is `PASS` (92,829 units scanned by `production-prep/rare/final-scan.py`; the `-` verdicts are the EMPTY units and the FAIL units, which have no merged file). Merged CAFs: 30,629 + 30,613 (nueCC, 361 GB) and 17,603 (NC, 59 GB), at `<work>/node<k>/<unit>/merged/reco2-<unit>.wc.flat.caf.root`.
+
+### 7a. Cost (cost-summary.md per job)
+
+| step | nueCC wall / CPU per event [s] | nueCC RSS median / max [GB] | NC wall / CPU per event [s] | NC RSS median / max [GB] |
+|---|---|---|---|---|
+| step1 (lar) | 41.6 / 39.0 | 1.5 / 4.9 | 56.3 / 49.6 | 1.5 / 3.5 |
+| step2 (wire-cell) | 30.3 / 29.5 | 1.3 / 4.3 | 20.2 / 19.1 | 1.2 / 1.9 |
+| step3 (merge) | 1.0 / 0.9 | 0.4 | 5.4 / 5.1 | 0.4 |
+| validate | 2.4 / 2.2 | 0.6 | 6.9 / 6.7 | 0.4 |
+
+(NC units are mostly 1 event, so the per-event numbers carry the whole per-unit start-up.) The pools held 76-77 units per node throughout (pids ~5,300-5,800 of the 8,192 cap, ~75 GB RSS per node, no memory-guard or pids-guard waits, 0 pool stalls). Disk at `WC_KEEP=semiprod`: nueCC-A 562 GB, nueCC-B 563 GB, NC 127 GB (1.25 TB in all, ~4.2 MB per nueCC event; the estimate was 1.3 TB).
+
+### 7b. The 94 non-OK units (`production-prep/rare/bad-units.tsv`: sample, node, id, status, reco1 / wire-cell / lost events, crashing ident of each step-2 try, reco1 path)
+
+| cause | units | events lost | what the driver did |
+|---|---|---|---|
+| step-2 segfault / abort (rc 139 / 134) on an event, both tries | 75 PARTIAL (nueCC) | 183 | the events from the crashing one onward have no Wire-Cell output; the merged CAF keeps the rest (`events.json`: `step2_failed: ["all"]`, `caf_events_without_wirecell`) |
+| same, crashing on the unit's first event | 10 FAIL (nueCC) + 1 FAIL (NC) | 55 + 1 | `FAIL step2 no complete Wire-Cell event`; no merged file |
+| step-1 lar RSS > 48 GB on one event (watchdog, rc 137) | 7 PARTIAL (nueCC) | 7 | the event is skipped (`events.json: skipped[]`), the others rerun and merged |
+| step-2 timeout (rc 124, both tries) | 1 PARTIAL (nueCC-B `a3f6-0048`) | 1 | as the segfault case |
+
+In 63 of the 86 crash units both tries died on the same event (ident); in 23 the second try died on a different one, so part of the loss is not deterministic in the event. Over the whole campaign step 2 crashed 831 times (rc 139 663, rc 134 162, rc 133 2, rc 124 2) in 61,170 nueCC step-2 runs, i.e. once per ~320 events; the pool's retry recovered all but the 86 units above. Wasted compute in the failed tries: 102 CPU-hours (~1 node-hour). Step 1 was killed by the RSS watchdog 7 times in 61,256 runs (lar at 50-57 GB on a single event; the sample's median is 1.5 GB) -- the watchdog did its job, no node went into swap.
+
+Follow-up (optional, not started): a per-event rerun of the 94 units (step 2 one event at a time, skipping the crashing event) would recover most of the 183 + 7 + 1 events that follow a crash; the 11 FAIL units and the 7 watchdog events need the crash itself understood (toolkit d06a47d7, `MultiAlgBlobClustering` segfault; lar memory runaway on one event).
+
 ## 6. Log
+
+- 2026-11-03 04:35 UTC: all three jobs done (A 20:44, B 21:04, NC 00:30 UTC), ~129 node-hours; results in section 7; 94 non-OK units listed in `production-prep/rare/bad-units.tsv`; final report on issue #3.
 
 - 2026-11-02 13:54 UTC: the owner approved the plan as written (section 5): run as planned, nueCC first in both running slots, the multi-pair / single-container optimisation after this campaign. Submitted in capacity, `-A neutrinoGPU`, 8 nodes x 8 h each, `WC_MAXPAR=100 WC_RAMP_S=0 WC_LAUNCH_GAP_S=1 WC_KEEP=semiprod WC_TRUST_EVENTS=1`: **9032475** `wc-nuecc-A` (`nuecc/full/pairs-A.tsv`, 31,025 units / 134,208 events -> `nuecc/full/A/`) and **9032476** `wc-nuecc-B` (`pairs-B.tsv`, 31,025 / 134,657 -> `nuecc/full/B/`). The NC job (`wc-ncdr`, 8 x 4 h, `ncdr/full/pairs-all.tsv` -> `ncdr/full/work/`) is queued by `production-prep/rare/watch-full.sh submit-nc` once both nueCC jobs are running, so it takes the first slot that frees up (2 running jobs per user). Job ids in `production-prep/rare/jobs.txt`.
 
