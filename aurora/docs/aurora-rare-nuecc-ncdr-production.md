@@ -110,6 +110,17 @@ Disk (smoke work dirs at semiprod, `du`): nueCC 22.5 GB for ~4,600 events = **~4
 
 **Questions for the owner:** (1) approve the three jobs above as written? (2) output location: `$Y/production-prep/rare/...` as for the BNB, or elsewhere? (3) order: nueCC first (both slots), or NC first (smaller, the training sample)? (4) do the multi-pair / single-container optimisations now, after this campaign, or not at all?
 
+## 6. Log
+
+- 2026-11-03 04:35 UTC: all three jobs done (A 20:44, B 21:04, NC 00:30 UTC), ~129 node-hours; results in section 7; 94 non-OK units listed in `production-prep/rare/bad-units.tsv`; final report on issue #3.
+
+- 2026-11-02 13:54 UTC: the owner approved the plan as written (section 5): run as planned, nueCC first in both running slots, the multi-pair / single-container optimisation after this campaign. Submitted in capacity, `-A neutrinoGPU`, 8 nodes x 8 h each, `WC_MAXPAR=100 WC_RAMP_S=0 WC_LAUNCH_GAP_S=1 WC_KEEP=semiprod WC_TRUST_EVENTS=1`: **9032475** `wc-nuecc-A` (`nuecc/full/pairs-A.tsv`, 31,025 units / 134,208 events -> `nuecc/full/A/`) and **9032476** `wc-nuecc-B` (`pairs-B.tsv`, 31,025 / 134,657 -> `nuecc/full/B/`). The NC job (`wc-ncdr`, 8 x 4 h, `ncdr/full/pairs-all.tsv` -> `ncdr/full/work/`) is queued by `production-prep/rare/watch-full.sh submit-nc` once both nueCC jobs are running, so it takes the first slot that frees up (2 running jobs per user). Job ids in `production-prep/rare/jobs.txt`.
+
+- 2026-11-02 07:45 UTC: confirmation job 9032035 done (43 min): 418 OK / 87 EMPTY / 0 PARTIAL / 0 FAIL; the 53 collision units OK; trusted counts on all units. Full pair lists being built. Plan (section 5) to the owner.
+
+- 2026-11-02 07:00 UTC: both smokes ran to their walltime: nueCC 593 units/h/node (2,568 events/h), NC 923 units/h (795 events/h): the start-ups dominate (3a). 51 + 4 PARTIALs are the event-number collision in the single-file layout -> run/subrun/event layout for every unit; `WC_TRUST_EVENTS=1` drops the precheck container. Confirmation job 9032035 (debug) queued with both; the plan (section 6) goes to the owner after it.
+- 2026-11-02 04:10 UTC: samples inspected (1:1 pairing, small units), allocation found (17779), workflow changes above, smoke lists built (29 s each from the lists), smoke jobs 9031754 (nueCC) and 9031755 (NC) queued in capacity; issue #3 opened. Sidecar inventory of both full samples running on the UAN.
+
 ## 7. Results (campaign complete 2026-11-03 00:30 UTC)
 
 All three jobs ran to completion inside their walltimes (exit 0), ~129 node-hours in all (plan: 150). No resubmission was needed.
@@ -145,14 +156,3 @@ nueCC: **268,619 of 268,865 events** have Wire-Cell output (246 lost, 0.09 %); N
 In 63 of the 86 crash units both tries died on the same event (ident); in 23 the second try died on a different one, so part of the loss is not deterministic in the event. Over the whole campaign step 2 crashed 831 times (rc 139 663, rc 134 162, rc 133 2, rc 124 2) in 61,170 nueCC step-2 runs, i.e. once per ~320 events; the pool's retry recovered all but the 86 units above. Wasted compute in the failed tries: 102 CPU-hours (~1 node-hour). Step 1 was killed by the RSS watchdog 7 times in 61,256 runs (lar at 50-57 GB on a single event; the sample's median is 1.5 GB) -- the watchdog did its job, no node went into swap.
 
 Follow-up (optional, not started): a per-event rerun of the 94 units (step 2 one event at a time, skipping the crashing event) would recover most of the 183 + 7 + 1 events that follow a crash; the 11 FAIL units and the 7 watchdog events need the crash itself understood (toolkit d06a47d7, `MultiAlgBlobClustering` segfault; lar memory runaway on one event).
-
-## 6. Log
-
-- 2026-11-03 04:35 UTC: all three jobs done (A 20:44, B 21:04, NC 00:30 UTC), ~129 node-hours; results in section 7; 94 non-OK units listed in `production-prep/rare/bad-units.tsv`; final report on issue #3.
-
-- 2026-11-02 13:54 UTC: the owner approved the plan as written (section 5): run as planned, nueCC first in both running slots, the multi-pair / single-container optimisation after this campaign. Submitted in capacity, `-A neutrinoGPU`, 8 nodes x 8 h each, `WC_MAXPAR=100 WC_RAMP_S=0 WC_LAUNCH_GAP_S=1 WC_KEEP=semiprod WC_TRUST_EVENTS=1`: **9032475** `wc-nuecc-A` (`nuecc/full/pairs-A.tsv`, 31,025 units / 134,208 events -> `nuecc/full/A/`) and **9032476** `wc-nuecc-B` (`pairs-B.tsv`, 31,025 / 134,657 -> `nuecc/full/B/`). The NC job (`wc-ncdr`, 8 x 4 h, `ncdr/full/pairs-all.tsv` -> `ncdr/full/work/`) is queued by `production-prep/rare/watch-full.sh submit-nc` once both nueCC jobs are running, so it takes the first slot that frees up (2 running jobs per user). Job ids in `production-prep/rare/jobs.txt`.
-
-- 2026-11-02 07:45 UTC: confirmation job 9032035 done (43 min): 418 OK / 87 EMPTY / 0 PARTIAL / 0 FAIL; the 53 collision units OK; trusted counts on all units. Full pair lists being built. Plan (section 5) to the owner.
-
-- 2026-11-02 07:00 UTC: both smokes ran to their walltime: nueCC 593 units/h/node (2,568 events/h), NC 923 units/h (795 events/h): the start-ups dominate (3a). 51 + 4 PARTIALs are the event-number collision in the single-file layout -> run/subrun/event layout for every unit; `WC_TRUST_EVENTS=1` drops the precheck container. Confirmation job 9032035 (debug) queued with both; the plan (section 6) goes to the owner after it.
-- 2026-11-02 04:10 UTC: samples inspected (1:1 pairing, small units), allocation found (17779), workflow changes above, smoke lists built (29 s each from the lists), smoke jobs 9031754 (nueCC) and 9031755 (NC) queued in capacity; issue #3 opened. Sidecar inventory of both full samples running on the UAN.
