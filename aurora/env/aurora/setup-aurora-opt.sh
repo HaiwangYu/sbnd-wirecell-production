@@ -14,8 +14,10 @@
 Y=${Y:-/lus/flare/projects/neutrinoGPU/yuhw}
 export Y
 export UPS_TREE=/lus/flare/projects/neutrinoGPU/scisoft/larsoft
-export OPT=$Y/opt
-export WCT_SRC=$Y/wire-cell-toolkit
+# WC_OPT / WC_WCT_SRC: a development install and its checkout (ai-helper issue 44 used
+# $Y/opt-dlvtx44 + the $Y/wct-dlvtx44 worktree).  Unset => the production pair.
+export OPT=${WC_OPT:-$Y/opt}
+export WCT_SRC=${WC_WCT_SRC:-$Y/wire-cell-toolkit}
 export WCD=$Y/wire-cell-data
 export WCP_SBND=$Y/wcp-porting-validation/sbnd
 export LWC_VER=${LWC_VER:-v10_01_28}

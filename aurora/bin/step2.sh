@@ -6,6 +6,10 @@
 # unless DLVTX_DUMP=false.
 set -u
 TAR=${1:?tar}; OUT=${2:?outdir}; REAL=${3:?sim|data}; DUMP=${DLVTX_DUMP:-true}
+# ai-helper issue 44: DLVTX_SPACE=true also writes T_dlvtx_space (the Bee points of the clusters
+# touching a DL call's cloud).  Needs a toolkit with the dl_vtx_dump_space TLA; unset => the
+# TLA is not passed at all, so older toolkits run unchanged.
+SPACE_TLA=(); [ "${DLVTX_SPACE:-false}" = true ] && SPACE_TLA=(--tla-code dl_vtx_dump_space=true)
 # Per-event output directory template (toolkit Clus::per_event_name): the default 'pr_evt%1%'
 # is the art event number alone, which COLLIDES inside a multi-reco1 unit (gen2 BNB 1M: event
 # numbers restart at 1 in every subrun) -- run_pair.py sets WC_EVT_SUBDIR=pr_evt{run}_{subrun}_{event}
@@ -21,7 +25,7 @@ python3 -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(m) fo
 wire-cell -l stdout -L debug -c pgrapher/experiment/sbnd/wct-pr.jsonnet \
   --tla-str input="$TAR" --tla-str reality="$REAL" \
   --tla-str evt_subdir="$SUBDIR" \
-  --tla-code dl_vtx_dump="$DUMP" --tla-code flat_tree=true --tla-code truth_match=$TM > wct.log 2>&1
+  --tla-code dl_vtx_dump="$DUMP" ${SPACE_TLA[@]+"${SPACE_TLA[@]}"} --tla-code flat_tree=true --tla-code truth_match=$TM > wct.log 2>&1
 rc=$?
 grep -c "DL vertex failed" wct.log > dl_fail
 grep -c "RootFlatTreeVisitor.*no recTreeWireCell written" wct.log > flat_fail
