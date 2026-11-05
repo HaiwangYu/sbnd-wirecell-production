@@ -353,6 +353,23 @@ def ql_tag(a, b):
 
 
 slices, tars, skipped, lost = [(0, NEV)], [], [], []
+# WC_STEP1_SEEDED=1 (issue #4, step-2 reprocessing): ql/ was seeded from an earlier production by
+# bin/seed-from-step1.py.  Step 1 is never run: the step-1 output is every seeded ql/<tag> with a
+# DONE marker, as it is (a unit whose step 1 skipped an event has only s<a>-<b> slices, no "all"),
+# and the earlier skipped events / lost slices come from step1-seed.json.
+if E.get('WC_STEP1_SEEDED', '0') == '1':
+    slices = []
+    for qd in sorted(glob.glob(os.path.join(D, 'ql', '*', 'DONE'))):
+        tag = os.path.basename(os.path.dirname(qd))
+        m = re.match(r's(\d+)-(\d+)$', tag)
+        n = NEV if tag == 'all' else (int(m.group(2)) - int(m.group(1)) if m else 0)
+        tars.append((tag, n, os.path.join(os.path.dirname(qd), 'qlpctree.tar.gz')))
+    seed = os.path.join(D, 'step1-seed.json')
+    if os.path.exists(seed):
+        s = json.load(open(seed))
+        skipped, lost = s.get('skipped', []), s.get('lost_slices', [])
+    log('step1 seeded: %s; earlier skipped %d, lost slices %d' %
+        (' '.join('%s(%d)' % (t, n) for t, n, _ in tars) or 'none', len(skipped), len(lost)))
 while slices:
     a, b = slices.pop(0)
     if a >= b:
