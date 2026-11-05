@@ -354,20 +354,32 @@ def ql_tag(a, b):
 
 slices, tars, skipped, lost = [(0, NEV)], [], [], []
 # WC_STEP1_SEEDED=1 (issue #4, step-2 reprocessing): ql/ was seeded from an earlier production by
-# bin/seed-from-step1.py.  Step 1 is never run: the step-1 output is every seeded ql/<tag> with a
-# DONE marker, as it is (a unit whose step 1 skipped an event has only s<a>-<b> slices, no "all"),
-# and the earlier skipped events / lost slices come from step1-seed.json.
+# bin/seed-from-step1.py.  Step 1 is never run.  The slices are resolved as the loop below resolved
+# them in that production: start from (0, NEV) and split only around the events it skipped
+# (step1-seed.json), so a stale slice left by an earlier failed try next to a later complete "all"
+# is NOT used (its events would be counted twice).  A slice with no DONE and no skipped event in
+# it is lost.
 if E.get('WC_STEP1_SEEDED', '0') == '1':
-    slices = []
-    for qd in sorted(glob.glob(os.path.join(D, 'ql', '*', 'DONE'))):
-        tag = os.path.basename(os.path.dirname(qd))
-        m = re.match(r's(\d+)-(\d+)$', tag)
-        n = NEV if tag == 'all' else (int(m.group(2)) - int(m.group(1)) if m else 0)
-        tars.append((tag, n, os.path.join(os.path.dirname(qd), 'qlpctree.tar.gz')))
     seed = os.path.join(D, 'step1-seed.json')
     if os.path.exists(seed):
         s = json.load(open(seed))
-        skipped, lost = s.get('skipped', []), s.get('lost_slices', [])
+        skipped, lost = list(s.get('skipped', [])), list(s.get('lost_slices', []))
+    bad_idx = sorted(int(x['index']) for x in skipped)
+    while slices:
+        a, b = slices.pop(0)
+        if a >= b:
+            continue
+        tag = ql_tag(a, b)
+        qdir = os.path.join(D, 'ql', tag)
+        if os.path.exists(os.path.join(qdir, 'DONE')):
+            tars.append((tag, b - a, os.path.join(qdir, 'qlpctree.tar.gz')))
+            continue
+        inside = [i for i in bad_idx if a <= i < b]
+        if not inside:
+            if not any(l.get('slice') == [a, b] for l in lost):
+                lost.append({'slice': [a, b], 'why': 'seeded: no step-1 output', 'rc': -1})
+            continue
+        slices[:0] = [(a, inside[0]), (inside[0] + 1, b)]
     log('step1 seeded: %s; earlier skipped %d, lost slices %d' %
         (' '.join('%s(%d)' % (t, n) for t, n, _ in tars) or 'none', len(skipped), len(lost)))
 while slices:
