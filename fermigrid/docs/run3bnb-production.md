@@ -1,7 +1,10 @@
 # run3bnb: Run 3 BNB real data on FermiGrid, with the fg1 configuration
 
 - Tracking: [sbnd-wirecell-production #5](https://github.com/HaiwangYu/sbnd-wirecell-production/issues/5). fg1: [#1](https://github.com/HaiwangYu/sbnd-wirecell-production/issues/1).
-- **Status:** prepared and smoke-tested, **not submitted**. Waiting for the owner's go-ahead.
+- **Status:** **submitted 2026-11-07 23:15 CST** (owner's go-ahead; BNB only, not the Run 3 off-beam sample).
+  - Cluster `87458459@jobsub01`: 736 jobs, a plain cluster (index = `PROCESS`).
+  - Output `/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/run3bnb/bnb-data/`.
+  - Submit log: `production-prep/fermigrid-dev/run3bnb/submit.log`.
 
 ## Request (owner, 2026-11-07)
 
@@ -91,4 +94,7 @@ fg1 itself is unaffected: none of fg1's 50,241 files repeats an event number (ch
   - Sample checked (unblinded, 2,208 pairs, all ONLINE).
   - The `main` workflow's `evt_subdir` incompatibility with the fg1 build was found by the local smoke test.
   - The fg1-configuration tarball passed the emulated worker on 2 pairs (100/100 events).
-  - Issue #5 opened; waiting for the go-ahead.
+  - Issue #5 opened.
+  - Owner: submit, BNB only.
+  - The first submit attempt failed (no token: the r8 ticket cache no longer exists); resubmitted with the session's ticket (valid to 11-08 22:07, renewable to 11-14).
+  - Cluster `87458459@jobsub01`, 736 jobs, submitted 23:15.
