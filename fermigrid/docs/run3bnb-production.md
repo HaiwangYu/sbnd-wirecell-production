@@ -106,3 +106,4 @@ fg1 itself is unaffected: none of fg1's 50,241 files repeats an event number (ch
     - 2 with step 2 killed for memory on both tries, in `CreateSteinerGraph`: `70075734` lost 48 events (a 694k-vertex Steiner graph, 6.4 GB), `13d07c95` lost 22.
     - 2 with a step-1 segfault, 1 event each.
   - Merged CAFs copied to persistent (2,208 files, 26.6 GB, ADLER32-checked); README, lists and event list (109,487 events) written.
+- 2026-11-09: campaign **finished** (owner). The 72 missing events are not recovered for now: 70 from the two memory-killed step-2 pairs, whose qlpctrees are on scratch, and 2 from step-1 segfaults. Issue #5 closed.
