@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SBND Wire-Cell Productions</title>
+<meta name="description" content="Catalog of SBND Wire-Cell productions: Aurora training samples and FNAL (FermiGrid, sbndbuild03) evaluation samples, kept apart to avoid truth leakage.">
+<style>
+:root{
+  --bg:#f7f7f5; --panel:#ffffff; --ink:#1d1f23; --muted:#5d6370; --line:#e2e3e0;
+  --train:#2f6f4f; --train-bg:#e7f2ec; --eval:#2b5aa8; --eval-bg:#e6edf9;
+  --ok:#2f6f4f; --warn:#9a6200; --warn-bg:#fbf1dc; --bad:#a33a3a; --bad-bg:#f8e4e4; --run:#6a43a8; --run-bg:#efe8fa;
+  --code:#f0f0ec; --link:#2b5aa8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171a; --panel:#1d2024; --ink:#e7e8ea; --muted:#9aa1ad; --line:#30343a;
+    --train:#7cc49c; --train-bg:#1d2f25; --eval:#8eb1f0; --eval-bg:#1c2638;
+    --ok:#7cc49c; --warn:#e3b45c; --warn-bg:#33291a; --bad:#ec8a8a; --bad-bg:#3a2222; --run:#bea0ee; --run-bg:#2a2238;
+    --code:#262a30; --link:#8eb1f0; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171a; --panel:#1d2024; --ink:#e7e8ea; --muted:#9aa1ad; --line:#30343a;
+  --train:#7cc49c; --train-bg:#1d2f25; --eval:#8eb1f0; --eval-bg:#1c2638;
+  --ok:#7cc49c; --warn:#e3b45c; --warn-bg:#33291a; --bad:#ec8a8a; --bad-bg:#3a2222; --run:#bea0ee; --run-bg:#2a2238;
+  --code:#262a30; --link:#8eb1f0; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--link)}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}
+code{background:var(--code);padding:1px 4px;border-radius:4px;word-break:break-all}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 60px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+header h1{margin:0 0 6px;font-size:1.6rem}
+header p{margin:4px 0;color:var(--muted);max-width:820px}
+nav{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 4px;font-size:.92rem}
+h1,h2,h3{text-wrap:balance}
+td,.kv dd{font-variant-numeric:tabular-nums}
+.theme:focus-visible,a:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+h2{font-size:1.2rem;margin:36px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:1.02rem;margin:22px 0 8px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.side-training{background:var(--train-bg);color:var(--train)}
+.side-evaluation{background:var(--eval-bg);color:var(--eval)}
+.st-available{background:var(--train-bg);color:var(--ok)}
+.st-partial{background:var(--warn-bg);color:var(--warn)}
+.st-unverified{background:var(--code);color:var(--muted)}
+.st-deleted{background:var(--bad-bg);color:var(--bad)}
+.st-running{background:var(--run-bg);color:var(--run)}
+.cfg{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:700;font-size:.8rem;padding:1px 7px;border-radius:5px;border:1px solid var(--line);background:var(--panel);text-decoration:none;color:var(--ink)}
+.species{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}
+.species h3{margin:0 0 10px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:780px){.cols{grid-template-columns:1fr}}
+.col{min-width:0}
+.col h4{margin:0 0 8px;font-size:.85rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--bg)}
+.card .top{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px}
+.card .title{font-weight:650}
+.card .latest{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:2px 10px;font-size:.88rem}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.none{color:var(--muted);font-style:italic;font-size:.9rem;padding:6px 0}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:.87rem}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--bg);font-weight:650;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td.wide{min-width:260px}
+.callout{border-left:4px solid var(--warn);background:var(--warn-bg);padding:10px 14px;border-radius:6px;margin:12px 0}
+.callout ul{margin:6px 0 0;padding-left:20px}
+.callout li{margin:4px 0}
+footer{margin-top:40px;color:var(--muted);font-size:.85rem}
+.theme{float:right;font-size:.82rem;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <button class="theme" id="theme" type="button">Theme</button>
+  <h1>SBND Wire-Cell Productions</h1>
+  <p>Wire-Cell reconstruction productions for SBND, split by purpose. <b>Training</b> samples run on ALCF Aurora over privately generated MC; <b>evaluation</b> samples run at Fermilab over the official Gen2 SAM definitions. Keeping the two apart reduces the chance of truth leakage between training and evaluation.</p>
+  <p id="updated"></p>
+  <nav>
+    <a href="#current">Current productions</a>
+    <a href="#configs">Configurations</a>
+    <a href="#overlaps">Overlap &amp; leakage notes</a>
+    <a href="#history">History</a>
+  </nav>
+</header>
+
+<h2 id="current">Current productions</h2>
+<p style="color:var(--muted);margin-top:0">The latest two productions of each species on each side. Configuration labels link to the table below.</p>
+<div class="legend" id="legend"></div>
+<div id="species"></div>
+
+<h2 id="configs">Configurations</h2>
+<p style="color:var(--muted);margin-top:0">A configuration is the chain, the builds and the key knobs. Productions that share one carry the same label.</p>
+<div class="tablewrap"><table id="cfgtable"></table></div>
+
+<h2 id="overlaps">Overlap &amp; leakage notes</h2>
+<div class="callout" id="overlapbox"></div>
+
+<h2 id="history">History</h2>
+<p style="color:var(--muted);margin-top:0">Older productions, with whether their outputs still exist. "Unverified" means the issue records no deletion and nobody has checked the disk.</p>
+<div class="tablewrap"><table id="histtable"></table></div>
+
+<footer>
+  Sources: <a href="https://github.com/HaiwangYu/sbnd-wirecell-production/issues">sbnd-wirecell-production issues</a> ·
+  <a href="https://github.com/HaiwangYu/wire-cell-toolkit-ai-helper/issues">wire-cell-toolkit-ai-helper issues</a>.
+  Data: <code>docs/productions.js</code>.
+</footer>
+</div>
+
+<script src="productions.js"></script>
+<script>
+(function(){
+  const C = window.CATALOG;
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const num = n => (n === null || n === undefined) ? "—" : n.toLocaleString("en-US");
+  const issueLink = ref => {
+    const [repo, n] = ref.split("#");
+    const label = (repo === "prod" ? "prod" : "ai-helper") + " #" + n;
+    return `<a href="${C.repos[repo]}${n}">${label}</a>`;
+  };
+  const sideName = s => s === "training" ? "training" : "evaluation";
+  const statusPill = p => `<span class="pill st-${p.status}">${esc(p.status)}</span>`;
+  const cfgPill = c => `<a class="cfg" href="#cfg-${esc(c)}">${esc(c)}</a>`;
+  const speciesOf = p => Array.isArray(p.species) ? p.species : [p.species];
+  const sortKey = p => (p.date || "").slice(0, 10);
+
+  document.getElementById("updated").textContent = "Last updated " + C.updated + ".";
+
+  // legend
+  document.getElementById("legend").innerHTML =
+    ["training","evaluation"].map(s => `<span class="pill side-${s}">${esc(C.sides[s].title)}</span>`).join("") +
+    ["available","partial","running","unverified","deleted"].map(s => `<span class="pill st-${s}">${s}</span>`).join("");
+
+  // Current = latest two per species and side; the rest goes to history.
+  const current = new Set();
+  const card = (p, i) => {
+    const wc = p.events_wc === null || p.events_wc === undefined ? "—" :
+      `${num(p.events_wc)}${p.events ? " of " + num(p.events) : ""}`;
+    return `<div class="card">
+      <div class="top"><span class="latest">${i === 0 ? "latest" : "previous"}</span>${cfgPill(p.config)}${statusPill(p)}<span class="title">${esc(p.title)}</span></div>
+      <dl class="kv">
+        <dt>Date</dt><dd>${esc(p.date)} · ${esc(p.site)} · ${(p.issues||[]).map(issueLink).join(", ")}</dd>
+        ${p.input ? `<dt>Input</dt><dd>${esc(p.input)}</dd>` : ""}
+        <dt>Events</dt><dd>${wc} with Wire-Cell output</dd>
+        ${p.units ? `<dt>Units</dt><dd>${esc(p.units)}</dd>` : ""}
+        <dt>Output</dt><dd><code>${esc(p.output)}</code>${p.size ? " · " + esc(p.size) : ""}</dd>
+        ${p.list ? `<dt>File list</dt><dd><code>${esc(p.list)}</code></dd>` : ""}
+        <dt>Status</dt><dd>${esc(p.status_note || p.status)}</dd>
+        ${p.note ? `<dt>Note</dt><dd>${esc(p.note)}</dd>` : ""}
+      </dl></div>`;
+  };
+  let html = "";
+  for (const sp of C.species) {
+    html += `<section class="species" id="sp-${sp.key}"><h3>${esc(sp.name)}</h3><div class="cols">`;
+    for (const side of ["training","evaluation"]) {
+      const list = C.productions
+        .filter(p => p.side === side && speciesOf(p).includes(sp.key) && !Array.isArray(p.species))
+        .sort((a,b) => sortKey(b).localeCompare(sortKey(a)));
+      const top = list.slice(0, 2);
+      top.forEach(p => current.add(p.id));
+      html += `<div class="col"><h4><span class="pill side-${side}">${sideName(side)}</span></h4>` +
+        (top.length ? top.map(card).join("") : `<div class="none">No ${sideName(side)} production of this species yet.</div>`) +
+        `</div>`;
+    }
+    html += `</div></section>`;
+  }
+  document.getElementById("species").innerHTML = html;
+
+  // configurations
+  const usedBy = {};
+  for (const p of C.productions) (usedBy[p.config] ||= []).push(p);
+  const cfgRows = Object.entries(C.configs).map(([k, c]) => `<tr id="cfg-${esc(k)}">
+      <td>${cfgPill(k)}<br><span class="pill side-${c.side}">${sideName(c.side)}</span></td>
+      <td class="wide">${esc(c.summary)}<br><span style="color:var(--muted)">${esc(c.chain)}</span></td>
+      <td><span class="mono">${esc(c.toolkit)}</span></td>
+      <td><span class="mono">${esc(c.larwirecell || "—")}</span></td>
+      <td>${esc(c.workflow || "—")}${c.knobs ? "<br><span style='color:var(--muted)'>" + esc(c.knobs) + "</span>" : ""}</td>
+      <td>${esc(c.schema || "—")}<br><span style="color:var(--muted)">${esc(c.keep || "")}</span></td>
+      <td>${(usedBy[k]||[]).map(p => esc(p.id)).join("<br>") || "—"}<br>${(c.issues||[]).map(issueLink).join(", ")}</td>
+    </tr>`).join("");
+  document.getElementById("cfgtable").innerHTML =
+    `<thead><tr><th>Label</th><th>What it is</th><th>Toolkit</th><th>larwirecell</th><th>Workflow / knobs</th><th>CAF schema / kept</th><th>Used by</th></tr></thead><tbody>${cfgRows}</tbody>`;
+
+  // overlaps
+  document.getElementById("overlapbox").innerHTML =
+    `<b>What a reader should know before mixing samples</b><ul>${C.overlaps.map(o => `<li>${esc(o)}</li>`).join("")}</ul>`;
+
+  // history
+  const hist = C.productions.filter(p => !current.has(p.id)).sort((a,b) => sortKey(b).localeCompare(sortKey(a)));
+  const spName = k => (C.species.find(s => s.key === k) || {name:k}).name;
+  document.getElementById("histtable").innerHTML =
+    `<thead><tr><th>Date</th><th>Production</th><th>Config</th><th>Species</th><th>Events with WC</th><th>Data</th><th>Where</th><th>Issues</th></tr></thead><tbody>` +
+    hist.map(p => `<tr>
+      <td>${esc(p.date)}</td>
+      <td class="wide">${esc(p.title)}${p.note ? "<br><span style='color:var(--muted)'>" + esc(p.note) + "</span>" : ""}</td>
+      <td>${cfgPill(p.config)}<br><span class="pill side-${p.side}">${sideName(p.side)}</span></td>
+      <td>${speciesOf(p).map(spName).map(esc).join("<br>")}</td>
+      <td>${num(p.events_wc)}</td>
+      <td>${statusPill(p)}<br><span style="color:var(--muted)">${esc(p.status_note || "")}</span></td>
+      <td class="wide"><code>${esc(p.output)}</code>${p.size ? "<br>" + esc(p.size) : ""}</td>
+      <td>${(p.issues||[]).map(issueLink).join("<br>")}</td>
+    </tr>`).join("") + `</tbody>`;
+
+  // theme toggle
+  const btn = document.getElementById("theme");
+  const apply = t => { if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); };
+  try { apply(localStorage.getItem("theme")); } catch (e) {}
+  btn.addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur ? cur === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    apply(next); try { localStorage.setItem("theme", next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
