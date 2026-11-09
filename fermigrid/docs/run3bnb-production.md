@@ -1,7 +1,8 @@
 # run3bnb: Run 3 BNB real data on FermiGrid, with the fg1 configuration
 
 - Tracking: [sbnd-wirecell-production #5](https://github.com/HaiwangYu/sbnd-wirecell-production/issues/5). fg1: [#1](https://github.com/HaiwangYu/sbnd-wirecell-production/issues/1).
-- **Status:** **submitted 2026-11-07 23:15 CST** (owner's go-ahead; BNB only, not the Run 3 off-beam sample).
+- **Status:** **COMPLETE 2026-11-08.** 2,208 pairs: 2,204 OK, 4 PARTIAL. 109,415 / 109,487 events with Wire-Cell output (72 missing, 0.066 %). Merged CAFs on persistent `/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/run3bnb/` (README + lists there).
+- Submitted 2026-11-07 23:15 CST (owner's go-ahead; BNB only, not the Run 3 off-beam sample).
   - Cluster `87458459@jobsub01`: 736 jobs, a plain cluster (index = `PROCESS`).
   - Output `/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/run3bnb/bnb-data/`.
   - Submit log: `production-prep/fermigrid-dev/run3bnb/submit.log`.
@@ -98,3 +99,10 @@ fg1 itself is unaffected: none of fg1's 50,241 files repeats an event number (ch
   - Owner: submit, BNB only.
   - The first submit attempt failed (no token: the r8 ticket cache no longer exists); resubmitted with the session's ticket (valid to 11-08 22:07, renewable to 11-14).
   - Cluster `87458459@jobsub01`, 736 jobs, submitted 23:15.
+- 2026-11-08:
+  - All 2,208 pairs finished (`.done` for every pair).
+  - Job 39 held at the end ("over memory limit of 6048 Mb", after the auto-release) once its 3 pairs were done. On its restart `job.sh` skipped the finished pair. Removed with `jobsub_rm`.
+  - 4 PARTIAL pairs:
+    - 2 with step 2 killed for memory on both tries, in `CreateSteinerGraph`: `70075734` lost 48 events (a 694k-vertex Steiner graph, 6.4 GB), `13d07c95` lost 22.
+    - 2 with a step-1 segfault, 1 event each.
+  - Merged CAFs copied to persistent (2,208 files, 26.6 GB, ADLER32-checked); README, lists and event list (109,487 events) written.
