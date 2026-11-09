@@ -13,6 +13,8 @@ Edit **only** `productions.js`; `index.html` builds every section from it.
   - `issues` (`prod#N` for this repo, `aih#N` for wire-cell-toolkit-ai-helper);
   - `input`, `events`, `events_wc`, `units`, `output`, `size`;
   - `status` (`available` | `partial` | `running` | `unverified` | `deleted`), plus `status_note` and `note`.
+    - `available`: the merged outputs exist and under 1% of events lack Wire-Cell output. Evictable scratch products go in `status_note`.
+    - `partial`: 1% or more of events failed, or the main outputs were deleted.
 - **Current vs history:** the page shows the two latest single-species entries per species and side as current. Everything older goes to history automatically.
   - A multi-sample round (`species` given as a list) always goes to history.
 - **New configuration:** add it to `configs` under a short label.

@@ -126,7 +126,9 @@ window.CATALOG = {
     }
   },
 
-  // status: "available" (checked), "running", "partial" (some products deleted/evictable),
+  // status: "available" (merged outputs present, <1% of events without Wire-Cell output;
+  //         evictable scratch products are noted in status_note), "running",
+  //         "partial" (>=1% of events failed, or main outputs deleted),
   //         "deleted", "unverified" (not checked; issue says nothing about deletion).
   productions: [
     // ---------------- training: Aurora ----------------
@@ -179,7 +181,7 @@ window.CATALOG = {
       input: "SAM aurora_SBND2026A_gen2_BNBLight_prodgenie_corsika_proton_rockbox0p1_sbnd_CV_v10_14_02_03_reco1_sbnd / ..._flatcaf_sbnd (seeded random, r8 files first)",
       events: 500000, events_wc: 499899, units: "37,742 pairs: 37,720 OK, 22 PARTIAL",
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/mc-cv/<id>/ (merged CAFs, 447 GB)",
-      size: "tracking-pr 276 GB + qlpctree 912 GB on scratch only", status: "partial",
+      size: "tracking-pr 276 GB + qlpctree 912 GB on scratch only", status: "available",
       status_note: "merged CAFs on persistent; tracking-pr.root and qlpctree on dCache scratch, which evicts unused files (not checked)",
       note: "Event list: prod-fermigrid/fg1/lists/events-mc-cv.tsv.gz." },
     { id: "r8-cv", species: "mc-bnb", side: "evaluation", config: "r8", site: "sbndbuild03",
@@ -192,7 +194,7 @@ window.CATALOG = {
       input: "SAM aurora_SBND2026A_gen2_BNBLight_prodgenie_corsika_proton_rockbox0p1_sbnd_EX_nuecc_v10_14_02_05_reco1_sbnd / ..._flat_caf_sbnd",
       events: 100003, events_wc: 99946, units: "11,445 pairs: 11,421 OK, 20 PARTIAL, 4 EMPTY",
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/mc-nuecc/<id>/ (merged CAFs, 123 GB)",
-      size: "tracking-pr 102 GB + qlpctree 202 GB on scratch only", status: "partial",
+      size: "tracking-pr 102 GB + qlpctree 202 GB on scratch only", status: "available",
       status_note: "merged CAFs on persistent; the rest on dCache scratch (evictable, not checked)",
       note: "SAM has one nueCC sample; fg1 used most of it (only 2,023 unused files with a CAF remain)." },
     { id: "r8-nuecc", species: "mc-nuecc", side: "evaluation", config: "r8", site: "sbndbuild03",
@@ -205,7 +207,7 @@ window.CATALOG = {
       input: "SAM data_SBND2026A_Gen2_Run3_BeamLight_Fixed_Dev_Data_v10_14_02_08_reco1_sbnd / ..._flatcaf_sbnd (runs 20586–20597, 5e18 POT)",
       events: 109487, events_wc: 109415, units: "2,208 pairs: 2,204 OK, 4 PARTIAL (736 jobs, cluster 87458459@jobsub01)",
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/run3bnb/bnb-data/<id>/ (merged CAFs, 26.6 GB, ADLER32-checked; README.md and lists/)",
-      size: "qlpctree, tracking-pr tar and logs on scratch only (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/run3bnb/bnb-data/)", status: "partial",
+      size: "qlpctree, tracking-pr tar and logs on scratch only (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/run3bnb/bnb-data/)", status: "available",
       status_note: "merged CAFs on persistent; the rest on dCache scratch (evictable, not checked)",
       note: "Campaign finished 2026-11-09; the 72 events without Wire-Cell output are kept with wc.valid = 0 in the merged CAFs. 70 are in 2 pairs whose step 2 was killed for memory in CreateSteinerGraph (70075734: 48, 13d07c95: 22); 2 are step-1 ClusteringConnect1 segfaults. The 70 are recoverable by rerunning step 2 without the grid memory cap from the scratch qlpctrees (copy them to persistent first). Workflow pinned to c93da2c: main's per-event naming needs a newer toolkit than the fg1 build." },
     { id: "opendata", species: "beam-on", side: "evaluation", config: "opendata", site: "sbndbuild03",
@@ -220,7 +222,7 @@ window.CATALOG = {
       input: "SAM data_SBND2026A_gen2_InTime-Run1_v10_14_02_02_reco1_sbnd / ..._flatcaf_sbnd (sibling CAF)",
       events: 49970, events_wc: 49917, units: "1,096 pairs: 1,054 OK, 4 PARTIAL, 38 EMPTY",
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off/<id>/ (merged CAFs, 8 GB)",
-      size: "tracking-pr 8 GB + qlpctree 103 GB on scratch only", status: "partial",
+      size: "tracking-pr 8 GB + qlpctree 103 GB on scratch only", status: "available",
       status_note: "merged CAFs on persistent; the rest on dCache scratch (evictable, not checked)", note: "" },
     { id: "r8-beamoff", species: "beam-off", side: "evaluation", config: "r8", site: "sbndbuild03",
       title: "Beam-off (r7's 10k events)", date: "2026-10-16", issues: ["aih#42"],
