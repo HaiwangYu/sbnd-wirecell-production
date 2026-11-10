@@ -1,7 +1,10 @@
 # ncdr: MC NC Δ-radiative on FermiGrid, with the fg1 configuration
 
 - Tracking: [sbnd-wirecell-production #6](https://github.com/HaiwangYu/sbnd-wirecell-production/issues/6). The same configuration as fg1 ([#1](https://github.com/HaiwangYu/sbnd-wirecell-production/issues/1)) and run3bnb ([#5](https://github.com/HaiwangYu/sbnd-wirecell-production/issues/5)).
-- **Status:** submitted 2026-11-09 11:42 CST, cluster `87460684@jobsub01`, 158 jobs.
+- **Status: COMPLETE 2026-11-10.**
+  - 15,776 pairs: 9,150 OK + 6,626 EMPTY; 13,772 / 13,772 events with Wire-Cell output.
+  - Merged CAFs on persistent `/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/ncdr/` (9,150, 32.4 GB, ADLER32-checked; README + lists).
+  - Submitted 2026-11-09 11:42 CST: cluster `87460684@jobsub01`, 158 jobs.
 
 ## The sample
 
@@ -53,3 +56,9 @@ The fg1 configuration, as for run3bnb:
   - Pairs made; events counted (13,772); smoke test passed.
   - Owner: include the empty files, submit.
   - Submitted at 11:42 (cluster `87460684@jobsub01`, 158 jobs). All 158 showed held for a moment (jobsub attaching credentials), then idle.
+- 2026-11-09/10:
+  - 156 of 158 jobs left every pair finished. Two pairs were rerun:
+    - `1151-eb69…`: a step-1 timeout on a slow node.
+    - `0c96-5a66…`: an interrupted `tracking-pr.tar` copy.
+  - **`job.sh` limit found:** the "replace a leftover" path cannot delete on dCache from the grid (`ifdh rm` fails; the token cannot delete). The first rerun of `0c96` therefore withheld `.done`, correctly. Its leftovers were removed from sbndbuild03, and the second rerun was OK.
+  - Merged CAFs copied to persistent; README and lists written; reported on #6; added to the productions page.
