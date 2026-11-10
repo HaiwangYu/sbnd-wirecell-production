@@ -183,7 +183,7 @@ window.CATALOG = {
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off-train/<id> -> ../beam-off/<id> (relative symlinks to the merged-CAF folders; README.md and lists/)",
       size: "merged CAFs 4.40 GB (persistent); the pairs' tracking-pr tars and qlpctrees are listed in lists/ (dCache scratch, evictable)", status: "available",
       status_note: "checked 2026-11-10 (prod#1 comment 2026-11-10): 572 links, every one resolves to a non-empty merged CAF",
-      note: "Split of fg1 beam-off by run parity (owner, 2026-11-09): disjoint from fg1-beamoff-eval in runs and files. Every file of this sample has art subrun 1, so a subrun split was not possible. 125 of its files are r8 beam-off files (r7 events)." },
+      note: "Split of fg1 beam-off by run parity (owner, 2026-11-09): disjoint from fg1-beamoff-eval in runs and files. Every file of this sample has art subrun 1, so a subrun split was not possible. 123 of its files are r8 beam-off files (r7 events)." },
     // ---------------- evaluation: FNAL ----------------
     { id: "fg1-cv", species: "mc-bnb", side: "evaluation", config: "fg1", site: "FermiGrid",
       title: "MC BNB CV 500k", date: "2026-10-18", issues: ["prod#1"],
@@ -293,7 +293,7 @@ window.CATALOG = {
     "All FNAL MC CV / nueCC / beam-off rounds (tag, preflip, sync, r3, r5, r6, r7, r8) reuse the same 1000-file lists, and every r8 pair (= r7's events) is inside fg1. A model trained on r7, r3 or r8 events has seen part of fg1.",
     "Sne's r7_cloud / r7_space DL-vertex models were trained on r7 events (ai-helper #44 reports results on '12,693 held-out r7 events'). Evaluate them on fg1 only after removing the r8/r7 files (fg1 event lists: /pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/lists/events-<sample>.tsv.gz).",
     "Beam-on: r3 (10k) and the #12 FrameShift stagings were drawn from FixedDev, so they are inside the open-data production. FixedDev reco1 and the Respin CAF are the same events (ai-helper #28).",
-    "fg1 beam-off: fg1-beamoff-train (odd runs, 27,076 events) and fg1-beamoff-eval (even runs, 22,894) are disjoint in runs and files; fg1-beamoff (the full 50k) contains both. r8's 212 beam-off files (= r7's beam-off events) fall in both subsets (125 train, 89 eval), so a model trained on r7/r8/r3 beam-off events has seen part of the evaluation subset.",
+    "fg1 beam-off: fg1-beamoff-train (odd runs, 27,076 events) and fg1-beamoff-eval (even runs, 22,894) are disjoint in runs and files; fg1-beamoff (the full 50k) contains both. r8's 212 beam-off files (= r7's beam-off events) fall in both subsets (123 train, 89 eval), so a model trained on r7/r8/r3 beam-off events has seen part of the evaluation subset.",
     "aurora-r2 and aurora-r1 process the same events (r2 reruns step 2 only); fg2 (prepared, not run) would have been event-disjoint from fg1 by construction."
   ],
 
