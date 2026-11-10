@@ -130,7 +130,8 @@ window.CATALOG = {
   // status: "available" (merged outputs present, <1% of events without Wire-Cell output;
   //         evictable scratch products are noted in status_note), "running",
   //         "partial" (>=1% of events failed, or main outputs deleted),
-  //         "deleted", "unverified" (not checked; issue says nothing about deletion).
+  //         "deleted", "unverified" (not checked; issue says nothing about deletion),
+  //         "TruthLeakRisk" (data present, but the sample spans a training/evaluation split: use the subsets named in status_note).
   productions: [
     // ---------------- training: Aurora ----------------
     { id: "aurora-r2-bnb", species: "mc-bnb", side: "training", config: "aurora-r2", site: "Aurora",
@@ -247,8 +248,8 @@ window.CATALOG = {
       input: "SAM data_SBND2026A_gen2_InTime-Run1_v10_14_02_02_reco1_sbnd / ..._flatcaf_sbnd (sibling CAF)",
       events: 49970, events_wc: 49917, units: "1,096 pairs: 1,054 OK, 4 PARTIAL, 38 EMPTY",
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off/<id>/ (merged CAFs, 8 GB)",
-      size: "tracking-pr 8 GB + qlpctree 103 GB on scratch only", status: "available",
-      status_note: "checked 2026-11-09 (prod#1 comment 2026-11-09): 1,058 merged CAFs on persistent (8.1 GB, none empty); scratch still holds all 1,058 tracking-pr tars (7.7 GB) and 1,060 qlpctrees (103.0 GB).", note: "The full sample = fg1-beamoff-train (odd runs, training side) + fg1-beamoff-eval (even runs). For ML, use the two subsets; do not evaluate a model trained on fg1-beamoff-train on this full sample." },
+      size: "tracking-pr 8 GB + qlpctree 103 GB on scratch only", status: "TruthLeakRisk",
+      status_note: "Do not use this full sample for ML: it contains both the training and the evaluation beam-off events. Use fg1-beamoff-train (odd runs, training side) and fg1-beamoff-eval (even runs) instead. The data are intact: checked 2026-11-09 (prod#1 comment 2026-11-09): 1,058 merged CAFs on persistent (8.1 GB, none empty); scratch still holds all 1,058 tracking-pr tars (7.7 GB) and 1,060 qlpctrees (103.0 GB).", note: "The full sample = fg1-beamoff-train (odd runs, training side) + fg1-beamoff-eval (even runs). For ML, use the two subsets; do not evaluate a model trained on fg1-beamoff-train on this full sample." },
     { id: "r8-beamoff", species: "beam-off", side: "evaluation", config: "r8", site: "sbndbuild03",
       title: "Beam-off (r7's 10k events)", date: "2026-10-16", issues: ["aih#42"],
       input: "InTime-Run1 reco1, r7's 10,000 events recovered from SAM (212 pairs, sibling CAF)", events: 10071, events_wc: 10048, units: "212 OK",

@@ -77,6 +77,7 @@ h3{font-size:1.02rem;margin:22px 0 8px}
 .st-unverified{background:var(--code);color:var(--muted)}
 .st-deleted{background:var(--bad-bg);color:var(--bad)}
 .st-running{background:var(--run-bg);color:var(--run)}
+.st-TruthLeakRisk{background:var(--warn-bg);color:var(--bad);font-weight:700}
 .cfg{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:700;font-size:.8rem;padding:1px 7px;border-radius:5px;border:1px solid var(--line);background:var(--panel);text-decoration:none;color:var(--ink)}
 .species{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}
 .species h3{margin:0 0 10px}
@@ -164,7 +165,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
   // legend
   document.getElementById("legend").innerHTML =
     ["training","evaluation"].map(s => `<span class="pill side-${s}">${esc(C.sides[s].title)}</span>`).join("") +
-    ["available","partial","running","unverified","deleted"].map(s => `<span class="pill st-${s}">${s}</span>`).join("");
+    ["available","partial","running","unverified","deleted","TruthLeakRisk"].map(s => `<span class="pill st-${s}">${s}</span>`).join("");
 
   // Current = latest two per species and side; the rest goes to history.
   const current = new Set();
