@@ -4,12 +4,13 @@
 window.CATALOG = {
   updated: "2026-11-10",
 
-  // Where a production sits. "training" = Aurora, Avinay's privately generated gen2 MC.
+  // Where a production sits. "training" = Aurora, Avinay's privately generated gen2 MC, plus the
+  //   training half of the FNAL beam-off data (real data cannot be regenerated, so fg1 beam-off is split by run).
   // "evaluation" = FNAL (FermiGrid, sbndbuild03), official Gen2 SAM definitions.
   sides: {
     training: {
-      title: "Training (Aurora)",
-      blurb: "Run on ALCF Aurora over MC samples generated privately by Avinay (gen2, wct 0319). Not drawn from the official SAM definitions."
+      title: "Training (Aurora MC + fg1 beam-off odd runs)",
+      blurb: "MC: run on ALCF Aurora over samples generated privately by Avinay (gen2, wct 0319), not drawn from the official SAM definitions. Beam-off data: real data cannot be regenerated, so the FNAL fg1 beam-off production is split by run number; the odd-run half is the training sample (the even-run half is on the evaluation side)."
     },
     evaluation: {
       title: "Evaluation (FNAL: FermiGrid + sbndbuild03)",
@@ -175,6 +176,14 @@ window.CATALOG = {
       output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/rare/ncdr/full/work/node<k>/<unit>/merged/",
       size: "merged CAFs 59 GB; 127 GB at semiprod", status: "available", status_note: "checked on Flare 2026-11-09", note: "" },
 
+    { id: "fg1-beamoff-train", species: "beam-off", side: "training", config: "fg1", site: "FermiGrid",
+      title: "Beam-off (InTime) training subset: odd runs of fg1 beam-off", date: "2026-11-09", issues: ["prod#1"],
+      input: "fg1 beam-off (SAM data_SBND2026A_gen2_InTime-Run1_v10_14_02_02_reco1_sbnd), files of odd run numbers: 80 runs, 18253–18591",
+      events: 27076, events_wc: 27067, units: "572 pairs: 569 OK, 3 PARTIAL",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off-train/<id> -> ../beam-off/<id> (relative symlinks to the merged-CAF folders; README.md and lists/)",
+      size: "merged CAFs 4.40 GB (persistent); the pairs' tracking-pr tars and qlpctrees are listed in lists/ (dCache scratch, evictable)", status: "available",
+      status_note: "checked 2026-11-10 (prod#1 comment 2026-11-10): 572 links, every one resolves to a non-empty merged CAF",
+      note: "Split of fg1 beam-off by run parity (owner, 2026-11-09): disjoint from fg1-beamoff-eval in runs and files. Every file of this sample has art subrun 1, so a subrun split was not possible. 125 of its files are r8 beam-off files (r7 events)." },
     // ---------------- evaluation: FNAL ----------------
     { id: "fg1-cv", species: "mc-bnb", side: "evaluation", config: "fg1", site: "FermiGrid",
       title: "MC BNB CV 500k", date: "2026-10-18", issues: ["prod#1"],
@@ -225,13 +234,21 @@ window.CATALOG = {
       size: "qlpctree, tracking-pr tar and logs on scratch only (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/ncdr/mc-ncdr/)", status: "available",
       status_note: "checked 2026-11-10 (prod#6 comment 2026-11-10): 9,150 merged CAFs on persistent, none empty; the rest on dCache scratch (evictable)",
       note: "1-7 events per file (mean 1.5). Not the sample of the Aurora NC Δ-rad training campaigns (Avinay's private MC on Flare). The fg1 job.sh cannot replace a leftover file of an interrupted copy on the grid (no delete right); 1 pair needed a manual cleanup (prod#6)." },
+    { id: "fg1-beamoff-eval", species: "beam-off", side: "evaluation", config: "fg1", site: "FermiGrid",
+      title: "Beam-off (InTime) evaluation subset: even runs of fg1 beam-off", date: "2026-11-09", issues: ["prod#1"],
+      input: "fg1 beam-off (SAM data_SBND2026A_gen2_InTime-Run1_v10_14_02_02_reco1_sbnd), files of even run numbers: 76 runs, 18250–18592",
+      events: 22894, events_wc: 22850, units: "486 pairs: 485 OK, 1 PARTIAL",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off-eval/<id> -> ../beam-off/<id> (relative symlinks to the merged-CAF folders; README.md and lists/)",
+      size: "merged CAFs 3.72 GB (persistent); the pairs' tracking-pr tars and qlpctrees are listed in lists/ (dCache scratch, evictable)", status: "available",
+      status_note: "checked 2026-11-10 (prod#1 comment 2026-11-10): 486 links, every one resolves to a non-empty merged CAF",
+      note: "Split of fg1 beam-off by run parity (owner, 2026-11-09): disjoint from fg1-beamoff-train in runs and files. 89 of its files are r8 beam-off files (r7 events)." },
     { id: "fg1-beamoff", species: "beam-off", side: "evaluation", config: "fg1", site: "FermiGrid",
       title: "Beam-off (InTime) 50k", date: "2026-10-18", issues: ["prod#1"],
       input: "SAM data_SBND2026A_gen2_InTime-Run1_v10_14_02_02_reco1_sbnd / ..._flatcaf_sbnd (sibling CAF)",
       events: 49970, events_wc: 49917, units: "1,096 pairs: 1,054 OK, 4 PARTIAL, 38 EMPTY",
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off/<id>/ (merged CAFs, 8 GB)",
       size: "tracking-pr 8 GB + qlpctree 103 GB on scratch only", status: "available",
-      status_note: "checked 2026-11-09 (prod#1 comment 2026-11-09): 1,058 merged CAFs on persistent (8.1 GB, none empty); scratch still holds all 1,058 tracking-pr tars (7.7 GB) and 1,060 qlpctrees (103.0 GB).", note: "Split 2026-11-09 for ML (prod#1 comment 2026-11-10): odd runs = training, fg1/beam-off-train/ (572 files, 27,076 events, 80 runs); even runs = evaluation, fg1/beam-off-eval/ (486 files, 22,894 events, 76 runs). Disjoint in runs and files; each folder holds relative symlinks to beam-off/<id>, a README and lists/ (also the scratch tracking-pr/qlpctree paths)." },
+      status_note: "checked 2026-11-09 (prod#1 comment 2026-11-09): 1,058 merged CAFs on persistent (8.1 GB, none empty); scratch still holds all 1,058 tracking-pr tars (7.7 GB) and 1,060 qlpctrees (103.0 GB).", note: "The full sample = fg1-beamoff-train (odd runs, training side) + fg1-beamoff-eval (even runs). For ML, use the two subsets; do not evaluate a model trained on fg1-beamoff-train on this full sample." },
     { id: "r8-beamoff", species: "beam-off", side: "evaluation", config: "r8", site: "sbndbuild03",
       title: "Beam-off (r7's 10k events)", date: "2026-10-16", issues: ["aih#42"],
       input: "InTime-Run1 reco1, r7's 10,000 events recovered from SAM (212 pairs, sibling CAF)", events: 10071, events_wc: 10048, units: "212 OK",
@@ -276,6 +293,7 @@ window.CATALOG = {
     "All FNAL MC CV / nueCC / beam-off rounds (tag, preflip, sync, r3, r5, r6, r7, r8) reuse the same 1000-file lists, and every r8 pair (= r7's events) is inside fg1. A model trained on r7, r3 or r8 events has seen part of fg1.",
     "Sne's r7_cloud / r7_space DL-vertex models were trained on r7 events (ai-helper #44 reports results on '12,693 held-out r7 events'). Evaluate them on fg1 only after removing the r8/r7 files (fg1 event lists: /pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/lists/events-<sample>.tsv.gz).",
     "Beam-on: r3 (10k) and the #12 FrameShift stagings were drawn from FixedDev, so they are inside the open-data production. FixedDev reco1 and the Respin CAF are the same events (ai-helper #28).",
+    "fg1 beam-off: fg1-beamoff-train (odd runs, 27,076 events) and fg1-beamoff-eval (even runs, 22,894) are disjoint in runs and files; fg1-beamoff (the full 50k) contains both. r8's 212 beam-off files (= r7's beam-off events) fall in both subsets (125 train, 89 eval), so a model trained on r7/r8/r3 beam-off events has seen part of the evaluation subset.",
     "aurora-r2 and aurora-r1 process the same events (r2 reruns step 2 only); fg2 (prepared, not run) would have been event-disjoint from fg1 by construction."
   ],
 
