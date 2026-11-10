@@ -2,7 +2,7 @@
 // Sources: HaiwangYu/sbnd-wirecell-production issues and HaiwangYu/wire-cell-toolkit-ai-helper issues.
 // To update: edit this file only (see docs/README.md). Keep facts traceable to an issue comment.
 window.CATALOG = {
-  updated: "2026-11-09",
+  updated: "2026-11-10",
 
   // Where a production sits. "training" = Aurora, Avinay's privately generated gen2 MC.
   // "evaluation" = FNAL (FermiGrid, sbndbuild03), official Gen2 SAM definitions.
@@ -217,13 +217,21 @@ window.CATALOG = {
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-sbndbuild03/opendata-fixeddev/bnb-data/<id>/ (merged CAFs, 22 GB; qlpctree 180 GB)",
       size: "merged CAFs 22.4 GB + qlpctree 179.8 GB, both on persistent", status: "available", status_note: "moved to dCache persistent 2026-10-19 (ADLER32-checked; /exp copy deleted); checked 2026-11-09 (prod#1 comment 2026-11-09): 1,817 merged CAFs, 1,817 qlpctrees, 1,817 .done, none empty",
       note: "FixedDev reco1 and the Respin CAF are the same events (ai-helper #28)." },
+    { id: "ncdr", species: "mc-ncdr", side: "evaluation", config: "fg1", site: "FermiGrid",
+      title: "MC NC Δ-radiative (all of the SAM sample)", date: "2026-11-10", issues: ["prod#6"],
+      input: "SAM aurora_SBND2026A_gen2_BNBLight_prodgenie_corsika_proton_rockbox0p1_sbnd_EX_ncdeltarad_v10_14_02_05_reco1_sbnd / ..._flat_caf_sbnd (15,776 pairs; 729 reco1 without a CAF not run)",
+      events: 13772, events_wc: 13772, units: "15,776 pairs: 9,150 OK, 6,626 EMPTY (files without events) (158 jobs, cluster 87460684@jobsub01; 2 pairs rerun)",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/ncdr/mc-ncdr/<id>/ (merged CAFs, 32.4 GB, ADLER32-checked; README.md and lists/)",
+      size: "qlpctree, tracking-pr tar and logs on scratch only (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/ncdr/mc-ncdr/)", status: "available",
+      status_note: "checked 2026-11-10 (prod#6 comment 2026-11-10): 9,150 merged CAFs on persistent, none empty; the rest on dCache scratch (evictable)",
+      note: "1-7 events per file (mean 1.5). Not the sample of the Aurora NC Δ-rad training campaigns (Avinay's private MC on Flare). The fg1 job.sh cannot replace a leftover file of an interrupted copy on the grid (no delete right); 1 pair needed a manual cleanup (prod#6)." },
     { id: "fg1-beamoff", species: "beam-off", side: "evaluation", config: "fg1", site: "FermiGrid",
       title: "Beam-off (InTime) 50k", date: "2026-10-18", issues: ["prod#1"],
       input: "SAM data_SBND2026A_gen2_InTime-Run1_v10_14_02_02_reco1_sbnd / ..._flatcaf_sbnd (sibling CAF)",
       events: 49970, events_wc: 49917, units: "1,096 pairs: 1,054 OK, 4 PARTIAL, 38 EMPTY",
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off/<id>/ (merged CAFs, 8 GB)",
       size: "tracking-pr 8 GB + qlpctree 103 GB on scratch only", status: "available",
-      status_note: "checked 2026-11-09 (prod#1 comment 2026-11-09): 1,058 merged CAFs on persistent (8.1 GB, none empty); scratch still holds all 1,058 tracking-pr tars (7.7 GB) and 1,060 qlpctrees (103.0 GB).", note: "" },
+      status_note: "checked 2026-11-09 (prod#1 comment 2026-11-09): 1,058 merged CAFs on persistent (8.1 GB, none empty); scratch still holds all 1,058 tracking-pr tars (7.7 GB) and 1,060 qlpctrees (103.0 GB).", note: "Split 2026-11-09 for ML (prod#1 comment 2026-11-10): odd runs = training, fg1/beam-off-train/ (572 files, 27,076 events, 80 runs); even runs = evaluation, fg1/beam-off-eval/ (486 files, 22,894 events, 76 runs). Disjoint in runs and files; each folder holds relative symlinks to beam-off/<id>, a README and lists/ (also the scratch tracking-pr/qlpctree paths)." },
     { id: "r8-beamoff", species: "beam-off", side: "evaluation", config: "r8", site: "sbndbuild03",
       title: "Beam-off (r7's 10k events)", date: "2026-10-16", issues: ["aih#42"],
       input: "InTime-Run1 reco1, r7's 10,000 events recovered from SAM (212 pairs, sibling CAF)", events: 10071, events_wc: 10048, units: "212 OK",
