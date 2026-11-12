@@ -18,6 +18,8 @@ Edit **only** `productions.js`; `index.html` builds every section from it.
     - `TruthLeakRisk`: the data exist, but this sample spans a training/evaluation split, so using it for ML would mix training and evaluation events. `status_note` names the subsets to use instead.
 - **Current vs history:** the page shows the two latest single-species entries per species and side as current. Everything older goes to history automatically.
   - A multi-sample round (`species` given as a list) always goes to history.
+  - A species with `sides` (e.g. `selected-data: ["evaluation"]`) shows only those columns, and its cards carry no latest/previous label: they are parallel samples, not successive rounds.
+- **Selected Data** (`selected-data`) is evaluation only: hand-picked real-data events (issue #7), whatever site ran them. Never put a selected sample on the training side.
 - **New configuration:** add it to `configs` under a short label.
   - FermiGrid labels are `fg<N>`, Aurora labels `aurora-r<N>`. Older FNAL rounds keep their names (`r3` … `r8`).
   - Reuse an existing label only when the chain, the builds and the key knobs are the same.

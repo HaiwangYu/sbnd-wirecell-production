@@ -2,7 +2,7 @@
 // Sources: HaiwangYu/sbnd-wirecell-production issues and HaiwangYu/wire-cell-toolkit-ai-helper issues.
 // To update: edit this file only (see docs/README.md). Keep facts traceable to an issue comment.
 window.CATALOG = {
-  updated: "2026-11-10",
+  updated: "2026-11-12",
 
   // Where a production sits. "training" = Aurora, Avinay's privately generated gen2 MC, plus the
   //   training half of the FNAL beam-off data (real data cannot be regenerated, so fg1 beam-off is split by run).
@@ -23,7 +23,9 @@ window.CATALOG = {
     { key: "mc-nuecc",   name: "MC nueCC" },
     { key: "mc-ncdr",    name: "MC NC Δ-radiative" },
     { key: "beam-on",    name: "Beam-on data (BNB)" },
-    { key: "beam-off",   name: "Beam-off data (off-beam / InTime)" }
+    { key: "beam-off",   name: "Beam-off data (off-beam / InTime)" },
+    // sides: only these columns are shown for the species (default: both).
+    { key: "selected-data", name: "Selected Data (hand-picked real-data events)", sides: ["evaluation"] }
   ],
 
   // A configuration = chain + builds + key knobs. Productions that share one share a label.
@@ -39,6 +41,18 @@ window.CATALOG = {
       keep: "semiprod (merged CAF + per-event tracking-pr.root, no Bee)",
       knobs: "DLVTX_SPACE=true, dl_vtx_dump=true, flat_tree=true, truth_match=true",
       issues: ["prod#4"]
+    },
+    "aurora-r2-data": {
+      side: "evaluation",
+      summary: "The aurora-r2 chain on selected real-data events, both steps rerun on Aurora; tracking-pr.root + Bee, no CAF.",
+      chain: "input: FilterEventID + FrameShift reco1 → step 1 lar wcls-img-clus-matching-data.fcl → step 2 wct-pr.jsonnet (DL vertex + dump + T_dlvtx_space, flat tree, no truth match); no CAF merge",
+      toolkit: "step 1: fork sbnd-wc-flatcaf d06a47d7; step 2: fork sbnd-dlvtx-space-44 55177882",
+      larwirecell: "sbnd-wc-flatcaf ad5d942",
+      workflow: "sbnd-wirecell-production aurora/bin/step{1,2}.sh via production-prep/selected-r2/run.pbs (run_pair.py needs a CAF)",
+      schema: "af9c87c8 (as aurora-r2; recTreeWireCell inside each tracking-pr.root)",
+      keep: "per-event tracking-pr.root, Bee zips (step 1 + step 2), logs",
+      knobs: "DLVTX_SPACE=true, dl_vtx_dump=true, flat_tree=true, truth_match=false (data)",
+      issues: ["prod#7"]
     },
     "aurora-r1": {
       side: "training",
@@ -256,6 +270,24 @@ window.CATALOG = {
       output: "/exp/sbnd/data/users/yuhw/production-prep/r8-r26-truth-caf/{validation,semiprod}/beam-off/", size: "",
       status: "available", status_note: "checked 2026-11-09 on sbndbuild03 (prod#1 comment 2026-11-09): semiprod: 212 merged CAFs (1.6 GB) + 10,048 tracking-pr.root (1.6 GB); validation: 2 pairs / 100 events with Bee; none empty. r8 total 98 GB.", note: "Every r8 pair is also in fg1." },
 
+    // ---------------- selected data (evaluation only) ----------------
+    { id: "sel-nuecc-r2", species: "selected-data", side: "evaluation", config: "aurora-r2-data", site: "Aurora",
+      title: "Lynn's nueCC candidates (Run 1 BNB data, 48 events)", date: "2026-11-11", issues: ["prod#7"],
+      input: "48 run/subrun/event from Lynn's nueCC selection (sbnd-gen2-data/nuecc-lynn/lynn-nuecc-rse.csv), filtered from MCP2025C Fall25-Run1 BNB Dev reco1; runs 18253–18409 (37 events in 18255/18259)",
+      events: 48, events_wc: 48, units: "5 chunks, all OK (job 9077217); 0 DL-vertex failures",
+      output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/selected-r2/full/nuecc/pr/c*/pr_evt<run>_<subrun>_<event>/tracking-pr.root",
+      list: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/selected-r2/full/nuecc-tracking-pr.txt",
+      size: "307 MB", status: "available", status_note: "checked on Flare 2026-11-11: 48 tracking-pr.root, each with recTreeWireCell and T_dlvtx_space",
+      note: "Bee: https://www.phy.bnl.gov/twister/bee/set/4f52a144-8e3d-42f9-83db-cd7c8689f40a/event/list/ (index → event in nuecc-bee-order.txt). Vertex table (traditional / DL / final / T_tagger): nuecc-vertices.tsv. See full/README.md." },
+    { id: "sel-ncsb-r2", species: "selected-data", side: "evaluation", config: "aurora-r2-data", site: "Aurora",
+      title: "NC sideband (Run 1 BNB data, 19 events)", date: "2026-11-11", issues: ["prod#7"],
+      input: "19 run/subrun/event of the NC sideband (sbnd-gen2-data/nc-sideband-lynn/nc-sideband-rse.csv), filtered from Run 1 BNB reco1; runs 18255/18259 (FixedDev) and 18261/18345/18364 (RollingDev)",
+      events: 19, events_wc: 19, units: "2 chunks, all OK (job 9077217); 0 DL-vertex failures",
+      output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/selected-r2/full/ncsb/pr/c*/pr_evt<run>_<subrun>_<event>/tracking-pr.root",
+      list: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/selected-r2/full/ncsb-tracking-pr.txt",
+      size: "113 MB", status: "available", status_note: "checked on Flare 2026-11-11: 19 tracking-pr.root, each with recTreeWireCell and T_dlvtx_space",
+      note: "Bee: https://www.phy.bnl.gov/twister/bee/set/4af41192-e10c-4ea2-ae03-e8fdd8cb1d92/event/list/ (index → event in ncsb-bee-order.txt). Vertex table: ncsb-vertices.tsv. See full/README.md." },
+
     // ---------------- history (older than the latest two per species and side) ----------------
     { id: "r7-all", species: ["mc-bnb", "mc-nuecc", "beam-on", "beam-off"], side: "evaluation", config: "r7", site: "sbndbuild03",
       title: "r7: CV 13,112 · nueCC 8,877 · beam-on 10,000 · beam-off 10,000", date: "2026-10-08", issues: ["aih#38"],
@@ -295,6 +327,7 @@ window.CATALOG = {
     "Sne's r7_cloud / r7_space DL-vertex models were trained on r7 events (ai-helper #44 reports results on '12,693 held-out r7 events'). Evaluate them on fg1 only after removing the r8/r7 files (fg1 event lists: /pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/lists/events-<sample>.tsv.gz).",
     "Beam-on: r3 (10k) and the #12 FrameShift stagings were drawn from FixedDev, so they are inside the open-data production. FixedDev reco1 and the Respin CAF are the same events (ai-helper #28).",
     "fg1 beam-off: fg1-beamoff-train (odd runs, 27,076 events) and fg1-beamoff-eval (even runs, 22,894) are disjoint in runs and files; fg1-beamoff (the full 50k) contains both. r8's 212 beam-off files (= r7's beam-off events) fall in both subsets (123 train, 89 eval), so a model trained on r7/r8/r3 beam-off events has seen part of the evaluation subset.",
+    "Selected Data: evaluation only, never for training. The events are Run 1 BNB data; those in runs 18255/18259 (37 nueCC, 15 NC sideband) are also inside the open-data production.",
     "aurora-r2 and aurora-r1 process the same events (r2 reruns step 2 only); fg2 (prepared, not run) would have been event-disjoint from fg1 by construction."
   ],
 

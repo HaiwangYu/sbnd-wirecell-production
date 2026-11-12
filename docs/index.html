@@ -82,6 +82,7 @@ h3{font-size:1.02rem;margin:22px 0 8px}
 .species{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0}
 .species h3{margin:0 0 10px}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cols.one{grid-template-columns:1fr}
 @media (max-width:780px){.cols{grid-template-columns:1fr}}
 .col{min-width:0}
 .col h4{margin:0 0 8px;font-size:.85rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
@@ -173,7 +174,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
     const wc = p.events_wc === null || p.events_wc === undefined ? "—" :
       `${num(p.events_wc)}${p.events ? " of " + num(p.events) : ""}`;
     return `<div class="card" id="p-${esc(p.id)}">
-      <div class="top"><span class="latest">${i === 0 ? "latest" : "previous"}</span>${cfgPill(p.config)}${statusPill(p)}<span class="title">${esc(p.title)}</span></div>
+      <div class="top">${i < 0 ? "" : `<span class="latest">${i === 0 ? "latest" : "previous"}</span>`}${cfgPill(p.config)}${statusPill(p)}<span class="title">${esc(p.title)}</span></div>
       <dl class="kv">
         <dt>Date</dt><dd>${esc(p.date)} · ${esc(p.site)} · ${(p.issues||[]).map(issueLink).join(", ")}</dd>
         ${p.input ? `<dt>Input</dt><dd>${esc(p.input)}</dd>` : ""}
@@ -187,15 +188,15 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
   };
   let html = "";
   for (const sp of C.species) {
-    html += `<section class="species" id="sp-${sp.key}"><h3>${esc(sp.name)}</h3><div class="cols">`;
-    for (const side of ["training","evaluation"]) {
+    html += `<section class="species" id="sp-${sp.key}"><h3>${esc(sp.name)}</h3><div class="cols${(sp.sides||[]).length === 1 ? " one" : ""}">`;
+    for (const side of sp.sides || ["training","evaluation"]) {
       const list = C.productions
         .filter(p => p.side === side && speciesOf(p).includes(sp.key) && !Array.isArray(p.species))
         .sort((a,b) => sortKey(b).localeCompare(sortKey(a)));
       const top = list.slice(0, 2);
       top.forEach(p => current.add(p.id));
       html += `<div class="col"><h4><span class="pill side-${side}">${sideName(side)}</span></h4>` +
-        (top.length ? top.map(card).join("") : `<div class="none">No ${sideName(side)} production of this species yet.</div>`) +
+        (top.length ? top.map((p, i) => card(p, sp.sides ? -1 : i)).join("") : `<div class="none">No ${sideName(side)} production of this species yet.</div>`) +
         `</div>`;
     }
     html += `</div></section>`;
