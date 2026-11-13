@@ -33,6 +33,10 @@ The development record is ai-helper issue 39 (`wire-cell-toolkit-ai-helper/issue
 - **The intermittent PR crash.** Step 2 segfaults now and then (`TrackFitting::update_association`, `SteinerGrapher`; peak RSS ~4.5 GB), much more often on nueCC (~1 per 550 events) than on BNB CV (~1 per 13,000).
   - A crash also leaves the previous event's `tracking-pr.root` as a stub.
   - `run_pair.py` retries a failed tar once (`WC_STEP2_ATTEMPTS`) and keeps every failed try under `attempts/`. If all tries fail, it still merges the complete events of all tries, giving `PARTIAL`.
+- **The Go/ROOT SIGURG crash (multi-core hosts only).** `wire-cell` carries a Go runtime (go-jsonnet), and ROOT's SIGURG handler overflows its goroutine stacks. Step 2 then dies at random (rc 139, rarely rc 6) with a Go thread on top (`fatal error: unknown caller pc`, or a jump to `0x0`) and passes on rerun. Master and PR #543 alike.
+  - Seen only on sbndbuild03 (64 CPUs, no pinning): 18 of 335 local step-2 runs (master 1/52; same signature in the PR builds, per-input rates not distinguishable). 0 of 240 one-CPU FermiGrid jobs, even with `GOMAXPROCS=64`.
+  - Workaround for unpinned multi-core runs: `export GODEBUG=asyncpreemptoff=1` (0/10 on the crash-prone input, master 1/10), or `GOMAXPROCS=1`, or `taskset` one CPU per `wire-cell`. Not yet in the setup scripts.
+  - Different from the crash above (that one is also seen on one-CPU grid slots). Details: ai-helper issue #45 (`issues/45-go-sigurg-root-crash/`).
 - **A deterministic step-1 crash:** MC CV run 471 / subrun 18 / event 33 (`clustering_connect1` recursion). `run_pair.py` finds the failing event from the log and reruns the file in slices around it, giving `PARTIAL` with the event listed in `events.json`.
 - **`--nskip` counts in art's FileIndex order** (sorted by run / subrun / event), not tree order.
 - **Kerberos (FNAL):** a run longer than the ticket dies with rc 126. Use a renewable ticket in a fixed cache, renewed hourly. `run-pairs.sh` waits rather than fails while there is no ticket (`WC_KRB_WAIT=1`).

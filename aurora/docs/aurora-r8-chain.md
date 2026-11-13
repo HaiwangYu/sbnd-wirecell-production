@@ -246,6 +246,7 @@ Put this where the owner says: a new ai-helper issue folder `issues/<n>-<slug>/`
 | seen | where | what to do |
 |---|---|---|
 | step 2 segfaults now and then (`TrackFitting::update_association`, `SteinerGrapher`; RSS to ~4.5 GB): ~1 per 550 nueCC events, ~1 per 13,000 CV | FNAL r6–r8, fg1 | handled: a retry, then a partial merge → `PARTIAL` (CV 22 and nueCC 20 of fg1's 49k pairs) |
+| step 2 dies at random with a Go thread on top (`fatal error: unknown caller pc`, or a jump to `0x0`; rc 139, rarely rc 6), passes on rerun: ROOT's SIGURG handler overflows go-jsonnet goroutine stacks (ai-helper #45) | sbndbuild03 only (64 CPUs, unpinned), master and PR #543; 0 of 240 one-CPU FermiGrid jobs | the retry covers it; on unpinned multi-core hosts set `GODEBUG=asyncpreemptoff=1` (or `GOMAXPROCS=1`, or `taskset` one CPU per job) |
 | a deterministic step-1 crash, MC CV run 471 / subrun 18 / event 33 | r8 | handled: the event is skipped by slicing → `PARTIAL` |
 | reco1 files with an empty `Events` tree (SAM can still list events) | fg1: 38 InTime data and 4 nueCC files | `EMPTY no events in the reco1 file` (workflow 2026-10-18); nothing to do |
 | the DL vertex silently falls back to the geometric vertex without scn / `SCN_Vertex.py` on `PYTHONPATH` | #38 | `step2.sh` refuses to start and fails on `dl_fail` > 0; on Aurora the scn copy is `$Y/products/scn/v01_00_00` |
