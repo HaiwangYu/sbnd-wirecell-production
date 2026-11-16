@@ -20,6 +20,11 @@
 #      Nothing at the destination is overwritten: the logs of a later try of the pair go to
 #      <id>.logs.try<k>.tar.gz; a data file of an unfinished pair (an interrupted copy) is kept if
 #      its size matches, else replaced.
+# Step-2-only mode (ai-helper issue 48), WC_GRID_MODE=step2 (jobsub -e): the pairs list has a 6th column,
+# the kept step-1 qlpctree.tar.gz of an earlier production (one unsliced tar).  The job fetches that tar and
+# the CAF (not the reco1), seeds <work>/<id>/ql/all/ with it and runs run_pair.py with WC_STEP1_SEEDED=1,
+# WC_TRUST_EVENTS=1 (the event count from the list): step 2 (every pass), the merge, the validation.  The
+# qlpctree is not copied again; <id>.done names the kept one.
 # Local emulation (fermigrid/bin/emulate-worker.sh): WC_GRID_EMULATE=1 copies with cp from a
 # mounted /pnfs and writes the outputs under a local directory.
 set -u
@@ -35,6 +40,9 @@ export WC_SL7_SETUP=$WC_TOP/sbnd-wirecell-production/aurora/env/fnal/setup-fnal-
 export WC_WRAP=$WC_TOP/sbnd-wirecell-production/fermigrid/bin/grid-wrap.sh
 export WC_CPUSET= WC_KEEP=semiprod WC_STAMP_INPUT_FILE=1
 cat "$WC_TOP/TARBALL-PROVENANCE.txt"
+# ai-helper issue 48: step-2 passes and the DV2 bundle come from the submission (jobsub -e, bin/submit.sh)
+MODE=${WC_GRID_MODE:-full}; case $MODE in full|step2) ;; *) echo "WC_GRID_MODE must be full or step2"; exit 2 ;; esac
+echo "mode $MODE WC_STEP2_PASSES='${WC_STEP2_PASSES:-}' WC_DV2_BUNDLE='${WC_DV2_BUNDLE:-}' WC_VERTEX_METHOD='${WC_VERTEX_METHOD:-}' DLVTX_SPACE='${DLVTX_SPACE:-}'"
 # the UPS setup reads unset variables: no set -u while it runs
 set +u; source "$WC_SL7_SETUP" > setup.log 2>&1; src_rc=$?; set -u
 [ $src_rc = 0 ] && command -v wire-cell > /dev/null || { echo "setup failed (rc $src_rc)"; tail -20 setup.log; exit 3; }
@@ -100,7 +108,7 @@ finished() {   # finished <id>, with $names = the destination's file names
 n=0; nok=0; nempty=0; nskip=0
 grep -v '^#' "$listf" | sed -n "$((P*K+1)),$((P*K+K))p" > "$S/my-pairs.tsv"
 echo "pairs in this job: $(wc -l < "$S/my-pairs.tsv")"
-while IFS=$'\t' read -r id real r1 caf nev; do
+while IFS=$'\t' read -r id real r1 caf nev kept rest; do
   [ -z "$id" ] && continue
   n=$((n+1)); t=$(date +%s)
   echo "=== pair $n $id ($real, $nev events) $(date '+%F %T')"
@@ -110,9 +118,18 @@ while IFS=$'\t' read -r id real r1 caf nev; do
   if finished "$id"; then echo "  finished at the destination ($(echo "$names" | grep -c .) files), skipped"; nok=$((nok+1)); nskip=$((nskip+1)); continue; fi
   [ -n "$names" ] && echo "  unfinished at the destination: $(echo $names)"
   in=$S/in; rm -rf "$in" "$S/work"; mkdir -p "$in"
-  fetch "$r1" "$in" && fetch "$caf" "$in" || { echo "  FETCH FAILED"; rm -rf "$in"; continue; }
-  WC_RECO1_ORIG=$r1 WC_CAF_ORIG=$caf python3 "$A/bin/run_pair.py" "$id" "$real" "$in/$(basename "$r1")" "$in/$(basename "$caf")" \
+  if [ "$MODE" = step2 ]; then
+    [[ $nev =~ ^[1-9][0-9]*$ ]] && [ -n "${kept:-}" ] || { echo "  step2 mode needs the event count and the kept qlpctree in the list"; continue; }
+    fetch "$kept" "$in" && fetch "$caf" "$in" || { echo "  FETCH FAILED"; rm -rf "$in"; continue; }
+    mkdir -p "$S/work/$id/ql/all" && mv "$in/$(basename "$kept")" "$S/work/$id/ql/all/qlpctree.tar.gz" && touch "$S/work/$id/ql/all/DONE"
+    WC_STEP1_SEEDED=1 WC_TRUST_EVENTS=1 WC_PAIR_EVENTS=$nev WC_RECO1_ORIG=$r1 WC_CAF_ORIG=$caf \
+      python3 "$A/bin/run_pair.py" "$id" "$real" "$r1" "$in/$(basename "$caf")" \
       "$S/work" "$A/schema/recTreeWireCell.schema.json" > "$S/run_pair.out" 2>&1
+  else
+    fetch "$r1" "$in" && fetch "$caf" "$in" || { echo "  FETCH FAILED"; rm -rf "$in"; continue; }
+    WC_RECO1_ORIG=$r1 WC_CAF_ORIG=$caf python3 "$A/bin/run_pair.py" "$id" "$real" "$in/$(basename "$r1")" "$in/$(basename "$caf")" \
+      "$S/work" "$A/schema/recTreeWireCell.schema.json" > "$S/run_pair.out" 2>&1
+  fi
   d=$S/work/$id; st=$(cat "$d/status" 2>/dev/null || echo "NO STATUS")
   echo "  status: $st ($(( $(date +%s) - t )) s)"
   case "$st" in EMPTY*) [[ $nev =~ ^[1-9] ]] && echo "  note: the list says $nev events (SAM event_count); the copy has the source's size" ;; esac
@@ -121,13 +138,15 @@ while IFS=$'\t' read -r id real r1 caf nev; do
   logs=$S/out/$id.logs.tar.gz
   ( cd "$d" && tar -czf "$logs" --ignore-failed-read status run_pair.log run_pair.out events.json validate.json \
         merged/merge.json cost.tsv cost $(ls -d ql/*/lar.log.gz ql/*/frameshift.txt pr/*/wct.log.gz pr/*/dl_fail fs/*.log.gz \
+        pr-*/*/wct.log.gz pr-*/*/dl_fail validate-*.json merged/merge-*.json \
         attempts/*/*.log.gz attempts/*/*.txt 2>/dev/null) ) 2>/dev/null
   good=0
   case "$st" in
     OK*|PARTIAL*)
       good=1
-      for q in "$d"/ql/*/qlpctree.tar.gz; do tag=$(basename "$(dirname "$q")"); cp "$q" "$out/$id.qlpctree$([ "$tag" = all ] || echo ".$tag").tar.gz"; done
-      ( cd "$d" && tar -cf "$out/$id.tracking-pr.tar" pr/*/pr_evt*/tracking-pr.root )
+      [ "$MODE" = step2 ] || for q in "$d"/ql/*/qlpctree.tar.gz; do tag=$(basename "$(dirname "$q")"); cp "$q" "$out/$id.qlpctree$([ "$tag" = all ] || echo ".$tag").tar.gz"; done
+      # every pass: pr/ and, with WC_STEP2_PASSES, pr-<x>/ (issue 48)
+      ( cd "$d" && ls -d pr/*/pr_evt*/tracking-pr.root pr-*/*/pr_evt*/tracking-pr.root 2>/dev/null | tar -cf "$out/$id.tracking-pr.tar" -T - )
       cp "$d"/merged/*.root "$out/"
       ;;
     EMPTY*) good=1 ;;
@@ -155,6 +174,7 @@ while IFS=$'\t' read -r id real r1 caf nev; do
   if [ $good = 1 ] && [ $failed = 0 ]; then
     { echo "status	$st"; echo "job	${CLUSTER:-}.${PROCESS:-} ${JOBSUBJOBID:-} index $P host $(hostname) $(date '+%F %T')"
       [ "$lname" = "$id.logs.tar.gz" ] || echo "logs	$lname"
+      [ "$MODE" = step2 ] && echo "qlpctree	$kept"
       (cd "$out" && stat -c 'file	%s	%n' -- * 2>/dev/null); } > "$S/out/$id.done"
     if put "$S/out/$id.done" "$dest" "$id.done"; then
       nok=$((nok+1)); case "$st" in EMPTY*) nempty=$((nempty+1)) ;; esac

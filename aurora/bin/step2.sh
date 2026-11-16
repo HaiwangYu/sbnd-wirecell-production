@@ -10,6 +10,12 @@ TAR=${1:?tar}; OUT=${2:?outdir}; REAL=${3:?sim|data}; DUMP=${DLVTX_DUMP:-true}
 # touching a DL call's cloud).  Needs a toolkit with the dl_vtx_dump_space TLA; unset => the
 # TLA is not passed at all, so older toolkits run unchanged.
 SPACE_TLA=(); [ "${DLVTX_SPACE:-false}" = true ] && SPACE_TLA=(--tla-code dl_vtx_dump_space=true)
+# ai-helper issue 48: WC_VERTEX_METHOD / WC_DV2_BUNDLE, when set, are passed as the vertex_method /
+# dv2_bundle TLAs (toolkit >= 0.38.0: 'dv2_split_move' (default), 'dv2_snap', 'dv2_split', 'original';
+# the bundle a wire-cell-data path such as dv2max/sbnd/aurora_space/bundle.json).  Unset => not passed,
+# so the toolkit's defaults apply and older toolkits run unchanged.
+VM_TLA=(); [ -n "${WC_VERTEX_METHOD:-}" ] && VM_TLA=(--tla-str vertex_method="$WC_VERTEX_METHOD")
+[ -n "${WC_DV2_BUNDLE:-}" ] && VM_TLA+=(--tla-str dv2_bundle="$WC_DV2_BUNDLE")
 # Per-event output directory template (toolkit Clus::per_event_name): the default 'pr_evt%1%'
 # is the art event number alone, which COLLIDES inside a multi-reco1 unit (gen2 BNB 1M: event
 # numbers restart at 1 in every subrun) -- run_pair.py sets WC_EVT_SUBDIR=pr_evt{run}_{subrun}_{event}
@@ -25,7 +31,7 @@ python3 -c "import importlib.util as u, sys; sys.exit(0 if all(u.find_spec(m) fo
 wire-cell -l stdout -L debug -c pgrapher/experiment/sbnd/wct-pr.jsonnet \
   --tla-str input="$TAR" --tla-str reality="$REAL" \
   --tla-str evt_subdir="$SUBDIR" \
-  --tla-code dl_vtx_dump="$DUMP" ${SPACE_TLA[@]+"${SPACE_TLA[@]}"} --tla-code flat_tree=true --tla-code truth_match=$TM > wct.log 2>&1
+  ${VM_TLA[@]+"${VM_TLA[@]}"} --tla-code dl_vtx_dump="$DUMP" ${SPACE_TLA[@]+"${SPACE_TLA[@]}"} --tla-code flat_tree=true --tla-code truth_match=$TM > wct.log 2>&1
 rc=$?
 grep -c "DL vertex failed" wct.log > dl_fail
 grep -c "RootFlatTreeVisitor.*no recTreeWireCell written" wct.log > flat_fail

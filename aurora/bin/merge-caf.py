@@ -13,6 +13,10 @@ Every entry carries the fixed schema (make-schema.py):
   - an event with Wire-Cell output: its values; a tree it did not write has 0 rows;
   - a CAF event without Wire-Cell output: wc.run/subrun/evt from the CAF,
     wc.valid = 0, every row count 0.
+--tree-name (ai-helper issue 48, default recTreeWireCell) names the output tree, so a second
+step-2 pass can be merged as its own tree: run again with --caf = the first merge's output and e.g.
+--tree-name recTreeWireCell_dv2snap.  The input files' per-event tree is always recTreeWireCell;
+only a --caf that already has the output tree is refused.
 Errors (nonzero exit, nothing kept): a branch outside the schema, a type that
 differs from the schema, a schema branch missing from a tree the event does
 have, two Wire-Cell files for one event, a Wire-Cell event that names an RSE the
@@ -37,6 +41,7 @@ ap.add_argument('--out', required=True)
 ap.add_argument('--schema', required=True)
 ap.add_argument('--summary', default=None)
 ap.add_argument('--caf-name', default=None, help='the CAF to record in the provenance when --caf is a local copy')
+ap.add_argument('--tree-name', default=wcflat.TREE_NAME, help='the output tree (default %(default)s)')
 ap.add_argument('files', nargs='+', help='tracking-pr.root files, or @file with one path per line')
 a = ap.parse_args()
 
@@ -74,8 +79,8 @@ f = ROOT.TFile.Open(tmp, 'UPDATE')
 rec = f.Get('recTree')
 if not rec:
     fail('%s has no recTree' % a.caf)
-if f.Get(wcflat.TREE_NAME):
-    fail('%s already has a %s' % (a.caf, wcflat.TREE_NAME))
+if f.Get(a.tree_name):
+    fail('%s already has a %s' % (a.caf, a.tree_name))
 rec.SetBranchStatus('*', 0)
 for k in ('rec.hdr.run', 'rec.hdr.subrun', 'rec.hdr.evt'):
     rec.SetBranchStatus(k, 1)
@@ -87,7 +92,7 @@ rec.SetBranchStatus('*', 1)
 
 # output tree with numpy buffers
 f.cd()
-out = ROOT.TTree(wcflat.TREE_NAME, 'Wire-Cell per-event tree, merged (ai-helper issue 39)')
+out = ROOT.TTree(a.tree_name, 'Wire-Cell per-event tree, merged (ai-helper issue 39)')
 out.SetDirectory(f)
 bufs = {}
 for b in schema:
@@ -153,7 +158,9 @@ info = {'caf': a.caf_name or os.path.abspath(a.caf), 'schema': os.path.abspath(a
         'n_caf_events_without_wirecell': len(caf_rse) - n_valid,
         'n_wirecell_events_not_in_caf': len(set(wc) - set(caf_rse)),
         'created': datetime.datetime.now().isoformat(timespec='seconds')}
-f.WriteTObject(ROOT.TNamed(wcflat.TREE_NAME + '_info', json.dumps(info)))
+if a.tree_name != wcflat.TREE_NAME:
+    info['tree'] = a.tree_name
+f.WriteTObject(ROOT.TNamed(a.tree_name + '_info', json.dumps(info)))
 f.Close()
 os.replace(tmp, a.out)
 if a.summary:

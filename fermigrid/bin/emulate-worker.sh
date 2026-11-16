@@ -10,7 +10,9 @@ TAR=$(realpath "${1:?tarball}"); LIST=$(realpath "${2:?pairs}"); K=${3:?}; P=${4
 mkdir -p "$W"/{tar,input,scratch,out}; W=$(realpath "$W")
 tar -C "$W/tar" -xzf "$TAR"; cp "$LIST" "$W/input/"
 IMG=/cvmfs/singularity.opensciencegrid.org/fermilab/fnal-dev-sl7:latest
+# what bin/submit.sh passes with jobsub -e (issue 48)
+XENV=; for v in WC_GRID_MODE WC_STEP2_PASSES WC_DV2_BUNDLE WC_VERTEX_METHOD DLVTX_SPACE WC_TRUST_EVENTS; do [ -n "${!v:-}" ] && XENV="$XENV,$v=${!v}"; done
 /cvmfs/oasis.opensciencegrid.org/mis/apptainer/current/bin/apptainer exec --contain --cleanenv \
   -B /cvmfs,/pnfs,"$W" --pwd "$W/scratch" \
-  --env INPUT_TAR_DIR_LOCAL="$W/tar",CONDOR_DIR_INPUT="$W/input",_CONDOR_SCRATCH_DIR="$W/scratch",PROCESS="$P",WC_GRID_EMULATE=1 \
+  --env INPUT_TAR_DIR_LOCAL="$W/tar",CONDOR_DIR_INPUT="$W/input",_CONDOR_SCRATCH_DIR="$W/scratch",PROCESS="$P",WC_GRID_EMULATE=1"$XENV" \
   "$IMG" bash "$W/tar/wc/sbnd-wirecell-production/fermigrid/bin/job.sh" "$(basename "$LIST")" "$K" "$SAMPLE" "$W/out"

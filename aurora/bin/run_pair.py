@@ -26,6 +26,14 @@ Exception handling (ai-helper issue 39 log (c)):
              (--nskip / -n), recursively, up to WC_STEP1_MAX_BAD skipped events per file.
   step 2     per step-1 tar; timeout = BASE + PER_EVENT * events; WC_STEP2_ATTEMPTS tries (default
              2).  A failed try is kept, never overwritten.
+             Passes (ai-helper issue 48): WC_STEP2_PASSES = space-separated <dir>:<vertex_method>:
+             <space|nospace>[:<schema>], e.g. "pr:dv2_split_move:space pr-dv2snap:dv2_snap:nospace".
+             Every pass runs step 2 on every tar into <dir>/<tag>/ (WC_VERTEX_METHOD, DLVTX_SPACE
+             set for step2.sh; WC_DV2_BUNDLE as given).  The first pass is merged as recTreeWireCell,
+             pass <dir> = pr-<x> as recTreeWireCell_<x>, each with its schema (a name relative to
+             the schema argument's directory; default the schema argument) and validated.  The
+             first <dir> must be "pr"; failed tries of pass <dir> go to attempts/step2.<dir>-*.
+             Unset: one pass "pr" with the toolkit's defaults, exactly as before.
   merge      the complete per-event files (collect-good.py: recTreeWireCell present) from the
              final AND failed step-2 tries are merged; CAF events without one get wc.valid = 0.
   status     OK       every CAF event has Wire-Cell output, nothing failed;
@@ -47,7 +55,8 @@ Keep (WC_KEEP), applied once the pair is merged and validated (OK or PARTIAL); a
   Failed tries under attempts/ keep only their logs (all but "all").
 
 Layout <workdir>/<id>/: fs/ (step 0, data), ql/<tag>/ (step 1, tag "all" or "s<a>-<b>"), pr/<tag>/ (step 2),
-attempts/, merged/, good.txt, events.json, validate.json, cost.tsv, status.
+[pr-<x>/<tag>/ (further step-2 passes)], attempts/, merged/, good.txt [good-pr-<x>.txt], events.json,
+validate.json [validate-pr-<x>.json], cost.tsv, status.
 """
 import glob
 import gzip
@@ -103,6 +112,27 @@ if STAMP and len(RECO1S) > 1 and 'WC_RECO1_ORIG' not in E:
 if KEEP not in ('all', 'minimal', 'validation', 'semiprod'):
     sys.exit('run_pair.py: WC_KEEP must be all, minimal, validation or semiprod')
 COST = os.path.join(D, 'cost.tsv')
+# step-2 passes (ai-helper issue 48), see the docstring
+PASSES = []
+for i, x in enumerate(E.get('WC_STEP2_PASSES', '').split()):
+    f = x.split(':')
+    if len(f) not in (3, 4) or f[2] not in ('space', 'nospace') or not f[0].startswith('pr') or '/' in f[0]:
+        sys.exit('run_pair.py: bad WC_STEP2_PASSES entry %r (<dir>:<vertex_method>:<space|nospace>[:<schema>])' % x)
+    if (i == 0) != (f[0] == 'pr') or (i > 0 and not f[0].startswith('pr-')):
+        sys.exit('run_pair.py: WC_STEP2_PASSES: the first pass dir must be "pr", the others "pr-<x>"')
+    sch = SCHEMA if len(f) == 3 else (f[3] if os.path.isabs(f[3]) else os.path.join(os.path.dirname(os.path.abspath(SCHEMA)), f[3]))
+    PASSES.append({'dir': f[0], 'vm': f[1], 'space': f[2] == 'space', 'schema': sch,
+                   'tree': 'recTreeWireCell' + ('' if i == 0 else '_' + f[0][3:]),
+                   'att': 'step2-' if i == 0 else 'step2.%s-' % f[0],
+                   'good': os.path.join(D, 'good.txt' if i == 0 else 'good-%s.txt' % f[0]),
+                   'vjson': os.path.join(D, 'validate.json' if i == 0 else 'validate-%s.json' % f[0]),
+                   'mjson': 'merge.json' if i == 0 else 'merge-%s.json' % f[0]})
+if len({p['dir'] for p in PASSES}) != len(PASSES):
+    sys.exit('run_pair.py: WC_STEP2_PASSES: duplicate pass dir')
+DEFAULT_PASS = not PASSES
+if DEFAULT_PASS:
+    PASSES = [{'dir': 'pr', 'vm': None, 'space': None, 'schema': SCHEMA, 'tree': 'recTreeWireCell', 'att': 'step2-',
+               'good': os.path.join(D, 'good.txt'), 'vjson': os.path.join(D, 'validate.json'), 'mjson': 'merge.json'}]
 
 
 def log(msg):
@@ -153,7 +183,7 @@ def cost_row(step, tag, attempt, rc, timefile, out_path):
                                                        du_mb(out_path) if out_path and os.path.exists(out_path) else 0))
 
 
-def container(name, cmd, timeout_s, cwd=None):
+def container(name, cmd, timeout_s, cwd=None, extra_env=None):
     """Run cmd inside SL7 with the run setup, timed, under timeout -k 60.  Returns (rc, timefile)."""
     timefile = os.path.join(D, 'cost', name + '.time')
     inner = ['/usr/bin/time', '-v', '-o', timefile]
@@ -163,6 +193,8 @@ def container(name, cmd, timeout_s, cwd=None):
     env = dict(os.environ, SL7_SETUP=SETUP)
     if STAMP:
         env['WCLS_INPUT_FILE'] = RECO1_ORIG
+    if extra_env:
+        env.update(extra_env)
     with open(os.path.join(D, 'cost', name + '.out'), 'w') as out:
         p = subprocess.Popen([WRAP] + inner, stdout=out, stderr=subprocess.STDOUT, env=env, cwd=cwd or D)
         peak = 0
@@ -274,7 +306,9 @@ def locality_ok(path):
 
 
 log('start %s %s reco1=%s caf=%s' % (ID, REAL, RECO1, CAF))
-for what, p in [('reco1', r) for r in RECO1S] + [('caf', CAF)]:
+# WC_STEP1_SEEDED=1: step 1 never runs, so the reco1 need not be here (a step-2-only grid job fetches only
+# the kept qlpctree and the CAF, ai-helper issue 48)
+for what, p in ([] if E.get('WC_STEP1_SEEDED', '0') == '1' else [('reco1', r) for r in RECO1S]) + [('caf', CAF)]:
     ok, why = locality_ok(p)
     if not ok:
         finish('FAIL precheck %s %s' % (what, why))
@@ -428,41 +462,54 @@ if KEEP != 'all' and os.path.isdir(FSDIR):
         os.remove(f)
 
 # ---------------------------------------------------------------- step 2 (fixes 2, 3, 5)
-pr_dirs, failed_dirs, step2_failed = [], [], []
-for tag, n, tar in tars:
-    pdir = os.path.join(D, 'pr', tag)
-    if os.path.exists(os.path.join(pdir, 'DONE')):
-        pr_dirs.append(pdir)
-        continue
-    ok = False
-    for k in range(ATTEMPTS2):
-        os.makedirs(pdir, exist_ok=True)
-        rc, tf = container('step2-%s-a%d' % (tag, k + 1), [os.path.join(BIN, 'step2.sh'), tar, pdir, REAL],
-                           T2B + T2E * n)
-        cost_row('step2', tag, k + 1, rc, tf, pdir)
-        if rc == 0:
-            open(os.path.join(pdir, 'DONE'), 'w').write('')
-            ok = True
-            break
-        keep, _ = next_attempt_dir('step2-' + tag)
-        shutil.move(pdir, keep)
-        failed_dirs.append(keep)
-        log('step2 %s try %d rc %d (%s); kept in %s' % (tag, k + 1, rc, 'timeout' if rc in (124, 137) else 'failed', keep))
-    if ok:
-        pr_dirs.append(pdir)
-    else:
-        step2_failed.append(tag)
-# earlier failed tries of this pair (previous runs) also count for the partial merge
-failed_dirs += [p for p in sorted(glob.glob(os.path.join(D, 'attempts', 'step2-*-try*'))) if p not in failed_dirs]
+for P in PASSES:
+    P['pr_dirs'], P['failed_dirs'], P['step2_failed'] = [], [], []
+    xenv = {}
+    if P['vm']:
+        xenv['WC_VERTEX_METHOD'] = P['vm']
+    if P['space'] is not None:
+        xenv['DLVTX_SPACE'] = 'true' if P['space'] else 'false'
+    sname = '' if P['dir'] == 'pr' else P['dir'] + '-'
+    for tag, n, tar in tars:
+        pdir = os.path.join(D, P['dir'], tag)
+        if os.path.exists(os.path.join(pdir, 'DONE')):
+            P['pr_dirs'].append(pdir)
+            continue
+        ok = False
+        for k in range(ATTEMPTS2):
+            os.makedirs(pdir, exist_ok=True)
+            rc, tf = container('step2-%s%s-a%d' % (sname, tag, k + 1), [os.path.join(BIN, 'step2.sh'), tar, pdir, REAL],
+                               T2B + T2E * n, extra_env=xenv)
+            cost_row('step2' if not sname else 'step2.' + P['dir'], tag, k + 1, rc, tf, pdir)
+            if rc == 0:
+                open(os.path.join(pdir, 'DONE'), 'w').write('')
+                ok = True
+                break
+            keep, _ = next_attempt_dir(P['att'] + tag)
+            shutil.move(pdir, keep)
+            P['failed_dirs'].append(keep)
+            log('step2 %s%s try %d rc %d (%s); kept in %s' % (sname, tag, k + 1, rc, 'timeout' if rc in (124, 137) else 'failed', keep))
+        if ok:
+            P['pr_dirs'].append(pdir)
+        else:
+            P['step2_failed'].append(tag)
+    # earlier failed tries of this pair (previous runs) also count for the partial merge
+    P['failed_dirs'] += [p for p in sorted(glob.glob(os.path.join(D, 'attempts', P['att'] + '*-try*')))
+                         if p not in P['failed_dirs']]
+step2_failed = PASSES[0]['step2_failed']
 
-good = os.path.join(D, 'good.txt')
-rc, _ = container('collect', ['python3', os.path.join(BIN, 'collect-good.py'), '-o', good] + pr_dirs + failed_dirs, 1800)
-try:
-    coll = json.loads(open(os.path.join(D, 'cost', 'collect.out')).read().strip().splitlines()[-1])
-except Exception:
-    finish('FAIL step2 cannot collect the step-2 files (rc %d)' % rc)
-if coll['complete'] == 0:
-    finish('FAIL step2 no complete Wire-Cell event', skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
+for P in PASSES:
+    cname = 'collect' if P['dir'] == 'pr' else 'collect-' + P['dir']
+    rc, _ = container(cname, ['python3', os.path.join(BIN, 'collect-good.py'), '-o', P['good']] + P['pr_dirs'] + P['failed_dirs'], 1800)
+    try:
+        P['coll'] = json.loads(open(os.path.join(D, 'cost', cname + '.out')).read().strip().splitlines()[-1])
+    except Exception:
+        finish('FAIL step2 %scannot collect the step-2 files (rc %d)' % ('' if P['dir'] == 'pr' else P['dir'] + ' ', rc))
+    if P['coll']['complete'] == 0:
+        finish('FAIL step2 %sno complete Wire-Cell event' % ('' if P['dir'] == 'pr' else P['dir'] + ' '),
+               skipped=skipped, lost_slices=lost, step2_failed=step2_failed,
+               **({} if DEFAULT_PASS else {'passes': {q['dir']: {'step2_failed': q['step2_failed']} for q in PASSES}}))
+coll = PASSES[0]['coll']
 
 # ---------------------------------------------------------------- step 3 + validation
 cafn = os.path.basename(CAF)
@@ -473,18 +520,28 @@ for ext in ('.flat.caf.root', '.caf.root', '.root'):
 mdir = os.path.join(D, 'merged')
 os.makedirs(mdir, exist_ok=True)
 merged = os.path.join(mdir, out_name)
-rc, tf = container('step3', ['python3', os.path.join(BIN, 'merge-caf.py'), '--caf', CAF, '--out', merged,
-                             '--schema', SCHEMA, '--summary', os.path.join(mdir, 'merge.json')]
-                   + (['--caf-name', CAF_ORIG] if CAF_ORIG != CAF else []) + ['@' + good], T3)
-cost_row('step3', 'all', 1, rc, tf, merged)
-if rc != 0:
-    finish('FAIL step3 merge rc %d' % rc, skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
-if E.get('WC_VALIDATE', '1') == '1':
-    rc, tf = container('validate', ['python3', os.path.join(BIN, 'validate-merge.py'), '--merged', merged,
-                                    '--caf', CAF, '--json', os.path.join(D, 'validate.json'), '@' + good], TV)
-    cost_row('validate', 'all', 1, rc, tf, None)
+for i, P in enumerate(PASSES):
+    # pass 0 merges onto the CAF; every further pass adds its tree to the merged file (in place, via .tmp)
+    sname = '' if i == 0 else '-' + P['dir']
+    targs = [] if i == 0 else ['--tree-name', P['tree']]
+    rc, tf = container('step3' + sname, ['python3', os.path.join(BIN, 'merge-caf.py'), '--caf', CAF if i == 0 else merged,
+                                         '--out', merged, '--schema', P['schema'], '--summary', os.path.join(mdir, P['mjson'])]
+                       + targs + (['--caf-name', CAF_ORIG] if (CAF_ORIG != CAF or i > 0) else []) + ['@' + P['good']], T3)
+    cost_row('step3' if i == 0 else 'step3.' + P['dir'], 'all', 1, rc, tf, merged)
     if rc != 0:
-        finish('FAIL validate rc %d' % rc, skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
+        if i > 0 and os.path.exists(merged):
+            os.remove(merged)      # never leave a merged file without every pass's tree
+        finish('FAIL step3%s merge rc %d' % (' ' + P['dir'] if i else '', rc), skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
+if E.get('WC_VALIDATE', '1') == '1':
+    for i, P in enumerate(PASSES):
+        others = [q['tree'] for q in PASSES if q is not P]
+        targs = [] if DEFAULT_PASS else ['--tree-name', P['tree']] + (['--also-trees', ','.join(others)] if others else [])
+        vname = 'validate' if i == 0 else 'validate-' + P['dir']
+        rc, tf = container(vname, ['python3', os.path.join(BIN, 'validate-merge.py'), '--merged', merged,
+                                   '--caf', CAF, '--json', P['vjson']] + targs + ['@' + P['good']], TV)
+        cost_row(vname, 'all', 1, rc, tf, None)
+        if rc != 0:
+            finish('FAIL validate%s rc %d' % (' ' + P['dir'] if i else '', rc), skipped=skipped, lost_slices=lost, step2_failed=step2_failed)
 
 
 def cleanup(keep_mode):
@@ -506,8 +563,10 @@ def cleanup(keep_mode):
         for f in os.listdir(qd):
             if f.endswith(big) and not (final and (f == 'qlpctree.tar.gz' or (keep_bee and f == 'mabc.zip'))):
                 rm(os.path.join(qd, f))
-    for pd in glob.glob(os.path.join(D, 'pr', '*')) + glob.glob(os.path.join(D, 'attempts', 'step2-*')):
-        final = os.path.dirname(pd) == os.path.join(D, 'pr')
+    pass_dirs = [os.path.join(D, P['dir']) for P in PASSES]
+    for pd in ([x for pdd in pass_dirs for x in glob.glob(os.path.join(pdd, '*'))]
+               + glob.glob(os.path.join(D, 'attempts', 'step2-*')) + glob.glob(os.path.join(D, 'attempts', 'step2.*'))):
+        final = os.path.dirname(pd) in pass_dirs
         for f in os.listdir(pd):
             if final and keep_pr and (f.startswith('pr_evt') or f == 'DONE'):
                 continue
@@ -528,4 +587,15 @@ missing = mj['n_caf_events_without_wirecell']
 info = dict(skipped=skipped, lost_slices=lost, step2_failed=step2_failed, caf_events=mj['n_caf_events'],
             wirecell_events=mj['n_wirecell_events'], caf_events_without_wirecell=missing,
             incomplete_files=coll['incomplete'], reco1_events=NEV, reco1_files=RECO1_FILES)
-finish('OK' if (missing == 0 and not skipped and not lost and not step2_failed) else 'PARTIAL', **info)
+all_ok = missing == 0 and not step2_failed
+if not DEFAULT_PASS:
+    info['passes'] = {}
+    for P in PASSES:
+        m = json.load(open(os.path.join(mdir, P['mjson'])))
+        info['passes'][P['dir']] = dict(tree=P['tree'], vertex_method=P['vm'], dl_vtx_dump_space=P['space'],
+                                        schema=os.path.basename(P['schema']), step2_failed=P['step2_failed'],
+                                        wirecell_events=m['n_wirecell_events'],
+                                        caf_events_without_wirecell=m['n_caf_events_without_wirecell'],
+                                        incomplete_files=P['coll']['incomplete'])
+        all_ok = all_ok and m['n_caf_events_without_wirecell'] == 0 and not P['step2_failed']
+finish('OK' if (all_ok and not skipped and not lost) else 'PARTIAL', **info)

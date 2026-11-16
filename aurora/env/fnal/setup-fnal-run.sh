@@ -10,3 +10,11 @@ source "$WCP_SBND/setup-dlvtx.sh"
 path-prepend "$WCP_SBND" FHICL_FILE_PATH
 export FHICL_FILE_PATH
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1
+# ai-helper issue 48: the DV2-MAX vertexer (toolkit >= 0.38.0) imports lightgbm, threadpoolctl and scipy.
+# Locally scipy comes from the wire-cell-python venv; a FermiGrid worker has no venv, so the code tarball
+# ships them as wc/pydv2 (make-tarball.sh WC_TARBALL_PYDV2), found here after the relocation
+# (/exp/sbnd/app/users/yuhw -> ${WC_TOP}).  Absent locally: nothing changes.
+WC_PYDV2=/exp/sbnd/app/users/yuhw/pydv2
+if [ -d "$WC_PYDV2" ]; then path-prepend "$WC_PYDV2" PYTHONPATH; export PYTHONPATH; fi
+# ai-helper #45: the Go/ROOT SIGURG step-2 crash
+export GODEBUG=asyncpreemptoff=1

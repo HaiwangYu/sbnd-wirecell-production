@@ -17,6 +17,10 @@ Checks, all exact:
      via the .v level), same type, NaN == NaN; a tree the file does not have has
      0 rows in recTreeWireCell;
   D. for every CAF event without one: wc.valid == 0 and every row count is 0.
+--tree-name (ai-helper issue 48, default recTreeWireCell) is the merged tree checked (B-D); the
+per-event files' tree is always recTreeWireCell.  --also-trees names the other Wire-Cell trees the
+merged file may carry (a second step-2 pass, e.g. recTreeWireCell_dv2snap), which check A then
+accepts as new keys (each with its _info); run once per tree.
 Exit 0 only if everything passes.
 """
 import argparse
@@ -33,12 +37,15 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--merged', required=True)
 ap.add_argument('--caf', required=True)
 ap.add_argument('--json', default=None)
+ap.add_argument('--tree-name', default=None, help='the merged tree to check (default recTreeWireCell)')
+ap.add_argument('--also-trees', default='', help='comma-separated other Wire-Cell trees expected in the merged file')
 ap.add_argument('files', nargs='+')
 a = ap.parse_args()
 files = []
 for x in a.files:
     files += [l.strip() for l in open(x[1:]) if l.strip()] if x.startswith('@') else [x]
 P = wcflat.PREFIX
+TN = a.tree_name or wcflat.TREE_NAME
 problems = []
 stats = {'events_checked': 0, 'rows_checked': 0, 'values_checked': 0, 'trees_checked': 0}
 
@@ -58,7 +65,7 @@ for k, v in ko.items():
     if km.get(k) != v:
         bad('A: key %s;%d differs: %s vs %s' % (k[0], k[1], v, km.get(k)))
 extra = sorted(set(k[0] for k in km) - set(k[0] for k in ko))
-if extra != sorted([wcflat.TREE_NAME, wcflat.TREE_NAME + '_info']):
+if extra != sorted(n for t in [TN] + [x for x in a.also_trees.split(',') if x] for n in (t, t + '_info')):
     bad('A: unexpected new keys %s' % extra)
 for tn in ('recTree', 'GenieEvtRecTree'):
     to, tm = of.Get(tn), mf.Get(tn)
@@ -66,11 +73,11 @@ for tn in ('recTree', 'GenieEvtRecTree'):
         bad('A: %s entries differ' % tn)
 
 # B. alignment
-rec, w = mf.Get('recTree'), mf.Get(wcflat.TREE_NAME)
+rec, w = mf.Get('recTree'), mf.Get(TN)
 if not w:
-    sys.exit('no %s in %s' % (wcflat.TREE_NAME, a.merged))
+    sys.exit('no %s in %s' % (TN, a.merged))
 if w.GetEntries() != rec.GetEntries():
-    bad('B: %s has %d entries, recTree %d' % (wcflat.TREE_NAME, w.GetEntries(), rec.GetEntries()))
+    bad('B: %s has %d entries, recTree %d' % (TN, w.GetEntries(), rec.GetEntries()))
 rec.SetBranchStatus('*', 0)
 for k in ('rec.hdr.run', 'rec.hdr.subrun', 'rec.hdr.evt'):
     rec.SetBranchStatus(k, 1)
@@ -191,6 +198,8 @@ for i in range(rec.GetEntries()):
 res = {'merged': a.merged, 'caf_entries': rec.GetEntries(), **stats,
        'wirecell_files': len(files), 'problems': len(problems), 'first_problems': problems[:20],
        'verdict': 'PASS' if not problems else 'FAIL'}
+if a.tree_name:
+    res['tree'] = TN
 if a.json:
     with open(a.json, 'w') as fo:
         json.dump(res, fo, indent=1)

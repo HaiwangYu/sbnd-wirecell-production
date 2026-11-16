@@ -13,6 +13,8 @@
 #   WC_GRID_USAGE    (DEDICATED,OPPORTUNISTIC)
 #   WC_GRID_IMAGE    the SL7 image the local productions use (fnal-dev-sl7)
 #   WC_GRID_MAXCONCURRENT      cap on running jobs of this submission (unset = none)
+#   WC_GRID_MODE (full|step2), WC_STEP2_PASSES, WC_DV2_BUNDLE, WC_VERTEX_METHOD, DLVTX_SPACE, WC_TRUST_EVENTS: passed to the jobs (jobsub -e) when set
+#                    (ai-helper issue 48: e.g. WC_STEP2_PASSES="pr:dv2_split_move:space pr-dv2snap:dv2_snap:nospace:<schema>")
 #   WC_GRID_LINES    extra condor lines, ';'-separated, e.g. the FIFE auto-release after a memory hold:
 #                    '+FERMIHTC_AutoRelease=True;+FERMIHTC_GraceMemory=2048;+FERMIHTC_GraceLifetime=3600'
 #                    (a restarted job skips the pairs already at the destination, bin/job.sh)
@@ -31,6 +33,7 @@ cmd=(jobsub_submit -G sbnd --role=Analysis -N "$NJ"
      --singularity-image "$IMG" --append_condor_requirements="$REQ"
      --tar_file_name "dropbox://$TAR" -f "dropbox://$PAIRS" --mail_never)
 [ -n "${WC_GRID_MAXCONCURRENT:-}" ] && cmd+=(--maxConcurrent "$WC_GRID_MAXCONCURRENT")
+for v in WC_GRID_MODE WC_STEP2_PASSES WC_DV2_BUNDLE WC_VERTEX_METHOD DLVTX_SPACE WC_TRUST_EVENTS; do [ -n "${!v:-}" ] && cmd+=(-e "$v"); done
 if [ -n "${WC_GRID_LINES:-}" ]; then IFS=';' read -ra L <<< "$WC_GRID_LINES"; for l in "${L[@]}"; do cmd+=(--lines "$l"); done; fi
 cmd+=("file://$F/bin/job.sh" "$(basename "$PAIRS")" "$K" "$SAMPLE" "$OUTBASE")
 echo "$(date '+%F %T') $N pairs, $K per job -> $NJ jobs; output $OUTBASE/$SAMPLE"
