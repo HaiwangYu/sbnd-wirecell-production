@@ -35,9 +35,12 @@ wire-cell -l stdout -L debug -c pgrapher/experiment/sbnd/wct-pr.jsonnet \
 rc=$?
 grep -c "DL vertex failed" wct.log > dl_fail
 grep -c "RootFlatTreeVisitor.*no recTreeWireCell written" wct.log > flat_fail
+# ai-helper issue 48: a missing BDT weight file only WARNs and skips that score (UbooneNueBDTScorer) -- refuse it
+grep -cE "weight file not found|file not found .* skipping" wct.log > weights_fail
 gzip -f wct.log
 if [ $rc -eq 0 ]; then
   [ "$(cat dl_fail)" = 0 ] || { echo "step2.sh: DL vertex failed $(cat dl_fail) times" >&2; rc=94; }
+  [ "$(cat weights_fail)" = 0 ] || { echo "step2.sh: weight file not found ($(cat weights_fail) log lines)" >&2; rc=91; }
   [ "$(cat flat_fail)" = 0 ] || { echo "step2.sh: recTreeWireCell not written for some event" >&2; rc=93; }
   ls pr_evt*/tracking-pr.root > /dev/null 2>&1 || { echo "step2.sh: no tracking-pr.root" >&2; rc=92; }
 fi
