@@ -59,12 +59,21 @@ for d in ${WC_TARBALL_DV2:-}; do cp_rel "wire-cell-data/$d"; done
 [ -n "${WC_TARBALL_PYDV2:-}" ] && { cp -a "$WC_TARBALL_PYDV2" "$W/pydv2"; find "$W/pydv2" -name __pycache__ -prune -exec rm -rf {} +; }
 for f in wire-cell-data/sbnd*.json* ; do cp_rel "$f"; done
 cp_rel wire-cell-data/uboone/scn_vtx/t48k-m16-l5-lr5d-res0.5-CP24.pth
-for f in XGB_nue_seed2_0923.xml numu_scalars_scores_0923.xml numu_tagger1.weights.xml numu_tagger2.weights.xml \
-         numu_tagger3.weights.xml cos_tagger_10.weights.xml br3_3_BDT.weights.xml br3_5_BDT.weights.xml \
-         br3_6_BDT.weights.xml lol_1_BDT.weights.xml lol_2_BDT.weights.xml pio_2_BDT.weights.xml \
-         sig_1_BDT.weights.xml sig_2_BDT.weights.xml stw_2_BDT.weights.xml stw_3_BDT.weights.xml \
-         stw_4_BDT.weights.xml tro_1_BDT.weights.xml tro_2_BDT.weights.xml tro_4_BDT.weights.xml \
-         tro_5_BDT.weights.xml; do cp_rel "wire-cell-data/uboone/weights/$f"; done
+# BDT/XGBoost weights: the fixed list below plus every uboone/weights file the shipped SBND config
+# names (ai-helper #48: 0.38.0's UbooneNueBDTScorer also resolves 15 legacy sub-BDT files; they are not
+# evaluated, but a missing one logs "weight file not found", which step2.sh now turns into rc 91).
+WEIGHTS="XGB_nue_seed2_0923.xml numu_scalars_scores_0923.xml numu_tagger1.weights.xml numu_tagger2.weights.xml
+         numu_tagger3.weights.xml cos_tagger_10.weights.xml br3_3_BDT.weights.xml br3_5_BDT.weights.xml
+         br3_6_BDT.weights.xml lol_1_BDT.weights.xml lol_2_BDT.weights.xml pio_2_BDT.weights.xml
+         sig_1_BDT.weights.xml sig_2_BDT.weights.xml stw_2_BDT.weights.xml stw_3_BDT.weights.xml
+         stw_4_BDT.weights.xml tro_1_BDT.weights.xml tro_2_BDT.weights.xml tro_4_BDT.weights.xml
+         tro_5_BDT.weights.xml
+         $(grep -ohE "uboone/weights/[A-Za-z0-9_.]+\.xml|bdt_weights_dir *\+ *'/[A-Za-z0-9_.]+\.xml'" \
+             "$W"/wire-cell-toolkit/cfg/pgrapher/experiment/sbnd/*.jsonnet 2>/dev/null | sed -E "s|.*/||; s|'||g")"
+for f in $(echo $WEIGHTS | tr ' ' '\n' | sort -u); do
+  [ -f "$Y/wire-cell-data/uboone/weights/$f" ] || { echo "make-tarball: weight file missing: uboone/weights/$f" >&2; exit 1; }
+  cp_rel "wire-cell-data/uboone/weights/$f"
+done
 for f in wcp-porting-img/sbnd/*.fcl wcp-porting-img/sbnd/*.jsonnet; do cp_rel "$f"; done
 mkdir -p "$W/wcp-porting-img/sbnd/standalone-sample"
 # --- workflow
