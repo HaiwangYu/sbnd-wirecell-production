@@ -121,7 +121,7 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
 </header>
 
 <h2 id="current">Current productions</h2>
-<p style="color:var(--muted);margin-top:0">The latest two productions of each species on each side. Configuration labels link to the table below.</p>
+<p style="color:var(--muted);margin-top:0">Every production of each species on each side, newest first. A production moves to History only when the owner decides (<code>history: true</code> in the catalog). Configuration labels link to the table below.</p>
 <div class="legend" id="legend"></div>
 <div id="species"></div>
 
@@ -168,13 +168,14 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
     ["training","evaluation"].map(s => `<span class="pill side-${s}">${esc(C.sides[s].title)}</span>`).join("") +
     ["available","partial","running","unverified","deleted","TruthLeakRisk"].map(s => `<span class="pill st-${s}">${s}</span>`).join("");
 
-  // Current = latest two per species and side; the rest goes to history.
+  // Current = every single-species production not marked history: true (owner's call, 2026-11-17);
+  // multi-sample rounds (species given as a list) and history: true entries go to history.
   const current = new Set();
   const card = (p, i) => {
     const wc = p.events_wc === null || p.events_wc === undefined ? "—" :
       `${num(p.events_wc)}${p.events ? " of " + num(p.events) : ""}`;
     return `<div class="card" id="p-${esc(p.id)}">
-      <div class="top">${i < 0 ? "" : `<span class="latest">${i === 0 ? "latest" : "previous"}</span>`}${cfgPill(p.config)}${statusPill(p)}<span class="title">${esc(p.title)}</span></div>
+      <div class="top">${i < 0 ? "" : `<span class="latest">${i === 0 ? "latest" : i === 1 ? "previous" : "earlier"}</span>`}${cfgPill(p.config)}${statusPill(p)}<span class="title">${esc(p.title)}</span></div>
       <dl class="kv">
         <dt>Date</dt><dd>${esc(p.date)} · ${esc(p.site)} · ${(p.issues||[]).map(issueLink).join(", ")}</dd>
         ${p.input ? `<dt>Input</dt><dd>${esc(p.input)}</dd>` : ""}
@@ -191,9 +192,9 @@ footer{margin-top:40px;color:var(--muted);font-size:.85rem}
     html += `<section class="species" id="sp-${sp.key}"><h3>${esc(sp.name)}</h3><div class="cols${(sp.sides||[]).length === 1 ? " one" : ""}">`;
     for (const side of sp.sides || ["training","evaluation"]) {
       const list = C.productions
-        .filter(p => p.side === side && speciesOf(p).includes(sp.key) && !Array.isArray(p.species))
+        .filter(p => p.side === side && speciesOf(p).includes(sp.key) && !Array.isArray(p.species) && !p.history)
         .sort((a,b) => sortKey(b).localeCompare(sortKey(a)));
-      const top = list.slice(0, 2);
+      const top = list;
       top.forEach(p => current.add(p.id));
       html += `<div class="col"><h4><span class="pill side-${side}">${sideName(side)}</span></h4>` +
         (top.length ? top.map((p, i) => card(p, sp.sides ? -1 : i)).join("") : `<div class="none">No ${sideName(side)} production of this species yet.</div>`) +

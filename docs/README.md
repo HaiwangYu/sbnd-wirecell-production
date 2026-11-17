@@ -16,12 +16,12 @@ Edit **only** `productions.js`; `index.html` builds every section from it.
     - `available`: the merged outputs exist and under 1% of events lack Wire-Cell output. Evictable scratch products go in `status_note`.
     - `partial`: 1% or more of events failed, or the main outputs were deleted.
     - `TruthLeakRisk`: the data exist, but this sample spans a training/evaluation split, so using it for ML would mix training and evaluation events. `status_note` names the subsets to use instead.
-- **Current vs history:** the page shows the two latest single-species entries per species and side as current. Everything older goes to history automatically.
+- **Current vs history (owner's rule, 2026-11-17):** every single-species entry is current, newest first; there is no per-species limit. An entry goes to history **only when the owner says so**: set `history: true` (and say when and why in `note`). Never move an entry to history on your own.
   - A multi-sample round (`species` given as a list) always goes to history.
   - A species with `sides` (e.g. `selected-data: ["evaluation"]`) shows only those columns, and its cards carry no latest/previous label: they are parallel samples, not successive rounds.
 - **Selected Data** (`selected-data`) is evaluation only: hand-picked real-data events (issue #7), whatever site ran them. Never put a selected sample on the training side.
 - **New configuration:** add it to `configs` under a short label.
-  - FermiGrid labels are `fg<N>`, Aurora labels `aurora-r<N>`. Older FNAL rounds keep their names (`r3` … `r8`).
+  - FermiGrid labels are `fg<N>`, Aurora labels `aurora-r<N>`. Older FNAL rounds keep their names (`r3` … `r8`). A round the owner names keeps that name (e.g. `WCLocal2026Nov16-Aurora`, `WCLocal2026Nov16-FermiGrid`).
   - Reuse an existing label only when the chain, the builds and the key knobs are the same.
 - **Data deleted or moved:** change `status` and `status_note`, and say in `status_note` when and where it was recorded.
 - **Overlaps:** add any training/evaluation overlap fact to `overlaps`.

@@ -2,7 +2,7 @@
 // Sources: HaiwangYu/sbnd-wirecell-production issues and HaiwangYu/wire-cell-toolkit-ai-helper issues.
 // To update: edit this file only (see docs/README.md). Keep facts traceable to an issue comment.
 window.CATALOG = {
-  updated: "2026-11-12",
+  updated: "2026-11-17",
 
   // Where a production sits. "training" = Aurora, Avinay's privately generated gen2 MC, plus the
   //   training half of the FNAL beam-off data (real data cannot be regenerated, so fg1 beam-off is split by run).
@@ -30,6 +30,30 @@ window.CATALOG = {
 
   // A configuration = chain + builds + key knobs. Productions that share one share a label.
   configs: {
+    "WCLocal2026Nov16-Aurora": {
+      side: "training",
+      summary: "WCT 0.38.0 release with the DV2-MAX aurora_space DL vertex (Sne, WireCell PR #547), two vertexing passes kept side by side: dv2_split_move (recTreeWireCell, with T_dlvtx_space) and dv2_snap (recTreeWireCell_dv2snap). Step 1 reused from aurora-r1 (0.38.0 step 1 reproduced 22/22 test units array by array).",
+      chain: "step 1: not rerun (aurora-r1 qlpctree tars, hardlinked) → step 2 wct-pr.jsonnet twice: vertex_method=dv2_split_move (pr/, dl_vtx_dump_space on) and dv2_snap (pr-dv2snap/) → one merged CAF with both Wire-Cell trees → validation of each tree",
+      toolkit: "WCT 0.38.0 (tag 0.38.0, c935e30d = master 647b2733 + version.txt)",
+      larwirecell: "sbnd-wc-flatcaf ad5d942 (step 1 of aurora-r1; not rerun)",
+      workflow: "sbnd-wirecell-production branch wclocal-nov16 (d05cf47 Aurora side)",
+      schema: "recTreeWireCell: af9c87c8 (as aurora-r2); recTreeWireCell_dv2snap: d4396a34 (production schema, no space)",
+      keep: "semiprod (merged CAF with 2 trees + per-event tracking-pr.root per pass, no Bee)",
+      knobs: "dv2_bundle dv2max/sbnd/aurora_space (wire-cell-data #8, bundle.json 51588842…); dl_vtx_dump, flat_tree, truth_match on MC; GODEBUG=asyncpreemptoff=1; 8-node capacity jobs",
+      issues: ["aih#48", "aih#47"]
+    },
+    "WCLocal2026Nov16-FermiGrid": {
+      side: "evaluation",
+      summary: "The same chain as WCLocal2026Nov16-Aurora on FermiGrid: WCT 0.38.0, aurora_space, two vertexing passes (dv2_split_move → recTreeWireCell, dv2_snap → recTreeWireCell_dv2snap). Step 2 only from the kept fg1 / run3bnb / open-data step-1 tars (0.38.0 step 1 reproduced 25/25 test pairs); 93 pairs from reco1.",
+      chain: "step 1: reused (fg1 / run3bnb tars on scratch, open-data tars on persistent); 93 PARTIAL/EMPTY/sliced pairs from reco1 → step 2 twice (dv2_split_move, dv2_snap) → one merged CAF with both trees → validation; 8 GB recovery pass for memory kills",
+      toolkit: "WCT 0.38.0 (tag 0.38.0, c935e30d)",
+      larwirecell: "sbnd-wc-flatcaf ad5d942",
+      workflow: "sbnd-wirecell-production branch wclocal-nov16 (53a90eb, f452d76); grid tarball wcgrid-wcl1116-53a90eb (DV2 Python env + aurora_space bundle + all 36 BDT weight files)",
+      schema: "recTreeWireCell: af9c87c8; recTreeWireCell_dv2snap: d4396a34",
+      keep: "semiprod; merged CAFs copied to dCache persistent (ADLER32-checked), tracking-pr tars on scratch",
+      knobs: "dv2_bundle aurora_space; dl_vtx_dump, flat_tree, truth_match on MC; 1 CPU, 4000 MB (+ an 8000 MB recovery pass); GODEBUG=asyncpreemptoff=1",
+      issues: ["aih#48"]
+    },
     "aurora-r2": {
       side: "training",
       summary: "aurora-r1 step 1 reused; step 2 rerun with T_dlvtx_space (Bee space points for DL vertex training) and the WCT PR #544 review fixes.",
@@ -146,7 +170,29 @@ window.CATALOG = {
   //         "partial" (>=1% of events failed, or main outputs deleted),
   //         "deleted", "unverified" (not checked; issue says nothing about deletion),
   //         "TruthLeakRisk" (data present, but the sample spans a training/evaluation split: use the subsets named in status_note).
+  // history: true → listed under History. Set it only when the owner says so (2026-11-17); r8-beamoff carries it because the
+  //   former "two latest per species" rule had already moved it there.
   productions: [
+    // ---------------- WCLocal2026Nov16 (aih#48): running ----------------
+    { id: "wcl1116-aurora-bnb", species: "mc-bnb", side: "training", config: "WCLocal2026Nov16-Aurora", site: "Aurora",
+      title: "BNB CV 1M, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17 (submitted)", issues: ["aih#48"],
+      input: "Avinay's gen2-wct0319 BNB CV; same 11,888 units as aurora-r1/r2 (step 1 reused)",
+      events: 627205, events_wc: 627170, units: "11,888: 11,874 OK, 14 PARTIAL (13 aurora-r1 step-1 skips + eb42, the deterministic step-2 segfault also seen in aurora-r2)",
+      output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/full/bnb/node<k>/<unit>/merged/ (both trees); per-pass tracking-pr in pr/ and pr-dv2snap/",
+      size: "", status: "running", status_note: "BNB done 2026-11-17 (job 9097095, 35.1 node-h): both validations PASS 11,888/11,888; 627,170 good events in each pass. running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).",
+      note: "Same events as aurora-r1/r2 BNB. recTreeWireCell = dv2_split_move (with T_dlvtx_space), recTreeWireCell_dv2snap = dv2_snap." },
+    { id: "wcl1116-aurora-nuecc", species: "mc-nuecc", side: "training", config: "WCLocal2026Nov16-Aurora", site: "Aurora",
+      title: "nueCC 269k, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17 (submitted)", issues: ["aih#48"],
+      input: "Avinay's gen2-sbnd-ccnue-configL-300k; same 61,252 non-empty units as aurora-r2 (step 1 reused)",
+      events: 268865, events_wc: null, units: "61,252 (running)",
+      output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/full/nuecc/node<k>/<unit>/merged/",
+      size: "", status: "running", status_note: "job 9097132 + resume 9097990 (WC_TASKS_PER_UNIT=75). running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).", note: "" },
+    { id: "wcl1116-aurora-ncdr", species: "mc-ncdr", side: "training", config: "WCLocal2026Nov16-Aurora", site: "Aurora",
+      title: "NC Δ-rad (train), WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17 (submitted)", issues: ["aih#48"],
+      input: "Avinay's NC Δ-rad train sample; same 17,604 non-empty units as aurora-r2 (step 1 reused)",
+      events: 26745, events_wc: 26745, units: "17,604: 17,604 OK",
+      output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/full/ncdr/node<k>/<unit>/merged/",
+      size: "", status: "running", status_note: "NC done 2026-11-17 (39.8 node-h): both validations PASS, 26,745/26,745 events in each pass. running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).", note: "" },
     // ---------------- training: Aurora ----------------
     { id: "aurora-r2-bnb", species: "mc-bnb", side: "training", config: "aurora-r2", site: "Aurora",
       title: "BNB CV 1M reprocessed with T_dlvtx_space", date: "2026-11-05", issues: ["prod#4"],
@@ -200,6 +246,46 @@ window.CATALOG = {
       status_note: "checked 2026-11-10 (prod#1 comment 2026-11-10): 572 links, every one resolves to a non-empty merged CAF",
       note: "Split of fg1 beam-off by run parity (owner, 2026-11-09): disjoint from fg1-beamoff-eval in runs and files. Every file of this sample has art subrun 1, so a subrun split was not possible. 123 of its files are r8 beam-off files (r7 events)." },
     // ---------------- evaluation: FNAL ----------------
+    { id: "wcl1116-fg-cv", species: "mc-bnb", side: "evaluation", config: "WCLocal2026Nov16-FermiGrid", site: "FermiGrid",
+      title: "MC BNB CV 500k, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-16 (submitted)", issues: ["aih#48"],
+      input: "the fg1 MC CV pairs (37,742; SAM ..._CV_v10_14_02_03_reco1_sbnd / ..._flatcaf_sbnd); step 1 reused from the fg1 tars",
+      events: 500000, events_wc: null, units: "37,742 pairs",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/WCLocal2026Nov16/mc-cv/<id>/ (merged CAFs, both trees)",
+      size: "tracking-pr tars on scratch (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/WCLocal2026Nov16/mc-cv/, -mem8g for the 8 GB recovery)", status: "running",
+      status_note: "main pass done 2026-11-17: 494,981 of 495,013 P5 events with Wire-Cell output (+ the 546-pair pilot); merged CAFs on persistent, ADLER32-checked. running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).",
+      note: "Same events as fg1-cv." },
+    { id: "wcl1116-fg-nuecc", species: "mc-nuecc", side: "evaluation", config: "WCLocal2026Nov16-FermiGrid", site: "FermiGrid",
+      title: "MC nueCC 100k, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-16 (submitted)", issues: ["aih#48"],
+      input: "the fg1 MC nueCC pairs (11,445); step 1 reused from the fg1 tars",
+      events: 100003, events_wc: null, units: "11,445 pairs",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/WCLocal2026Nov16/mc-nuecc/<id>/ (merged CAFs, both trees)",
+      size: "tracking-pr tars on scratch (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/WCLocal2026Nov16/mc-nuecc/)", status: "running",
+      status_note: "main pass done 2026-11-17: 98,997 of 99,015 P5 events with Wire-Cell output (+ pilot); 1 timeout pair rerunning at 8 GB / 4 h. running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).",
+      note: "Same events as fg1-nuecc." },
+    { id: "wcl1116-fg-beamoff", species: "beam-off", side: "evaluation", config: "WCLocal2026Nov16-FermiGrid", site: "FermiGrid",
+      title: "Beam-off (InTime) 50k, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-16 (submitted)", issues: ["aih#48"],
+      input: "the fg1 beam-off pairs (1,096; SAM data_SBND2026A_gen2_InTime-Run1_v10_14_02_02_reco1_sbnd); step 1 reused",
+      events: 49970, events_wc: null, units: "1,096 pairs",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/WCLocal2026Nov16/beam-off/<id>/ (merged CAFs, both trees)",
+      size: "tracking-pr tars on scratch (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/WCLocal2026Nov16/beam-off/)", status: "running",
+      status_note: "main pass done 2026-11-17: 49,414 of 49,466 P5 events with Wire-Cell output (+ pilot); 1 timeout pair rerunning at 8 GB / 4 h. running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).",
+      note: "Contains both run-parity halves of fg1 beam-off (fg1-beamoff-train = odd runs, fg1-beamoff-eval = even runs): do not use the full sample for ML; split it the same way when it is available." },
+    { id: "wcl1116-fg-run3bnb", species: "beam-on", side: "evaluation", config: "WCLocal2026Nov16-FermiGrid", site: "FermiGrid",
+      title: "Run 3 BNB data (run3bnb set), WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-16 (submitted)", issues: ["aih#48"],
+      input: "the run3bnb pairs (2,208; SAM data_SBND2026A_Gen2_Run3_BeamLight_Fixed_Dev_Data_v10_14_02_08_reco1_sbnd); step 1 reused",
+      events: 109487, events_wc: null, units: "2,208 pairs",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/WCLocal2026Nov16/run3bnb/<id>/ (merged CAFs, both trees)",
+      size: "tracking-pr tars on scratch (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/WCLocal2026Nov16/run3bnb/)", status: "running",
+      status_note: "main pass done 2026-11-17: 108,384 of 108,386 P5 events with Wire-Cell output (+ pilot). running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).",
+      note: "Same events as run3bnb." },
+    { id: "wcl1116-fg-opendata", species: "beam-on", side: "evaluation", config: "WCLocal2026Nov16-FermiGrid", site: "FermiGrid",
+      title: "Run 1 open FixedDev BNB data (opendata set), WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-16 (submitted)", issues: ["aih#48"],
+      input: "the open-data pairs (1,817; FixedDev reco1 + Respin CAF); step 1 reused from the open-data tars on persistent",
+      events: 89946, events_wc: null, units: "1,817 pairs",
+      output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/WCLocal2026Nov16/opendata/<id>/ (merged CAFs, both trees)",
+      size: "tracking-pr tars on scratch (/pnfs/sbnd/scratch/users/yuhw/prod-fermigrid/WCLocal2026Nov16/opendata/)", status: "running",
+      status_note: "main pass done 2026-11-17: 89,032 of 89,032 P5 events with Wire-Cell output (+ pilot). running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).",
+      note: "Same events as opendata (previously run on sbndbuild03)." },
     { id: "fg1-cv", species: "mc-bnb", side: "evaluation", config: "fg1", site: "FermiGrid",
       title: "MC BNB CV 500k", date: "2026-10-18", issues: ["prod#1"],
       input: "SAM aurora_SBND2026A_gen2_BNBLight_prodgenie_corsika_proton_rockbox0p1_sbnd_CV_v10_14_02_03_reco1_sbnd / ..._flatcaf_sbnd (seeded random, r8 files first)",
@@ -264,7 +350,7 @@ window.CATALOG = {
       output: "/pnfs/sbnd/persistent/users/yuhw/prod-fermigrid/fg1/beam-off/<id>/ (merged CAFs, 8 GB)",
       size: "tracking-pr 8 GB + qlpctree 103 GB on scratch only", status: "TruthLeakRisk",
       status_note: "Do not use this full sample for ML: it contains both the training and the evaluation beam-off events. Use fg1-beamoff-train (odd runs, training side) and fg1-beamoff-eval (even runs) instead. The data are intact: checked 2026-11-09 (prod#1 comment 2026-11-09): 1,058 merged CAFs on persistent (8.1 GB, none empty); scratch still holds all 1,058 tracking-pr tars (7.7 GB) and 1,060 qlpctrees (103.0 GB).", note: "The full sample = fg1-beamoff-train (odd runs, training side) + fg1-beamoff-eval (even runs). For ML, use the two subsets; do not evaluate a model trained on fg1-beamoff-train on this full sample." },
-    { id: "r8-beamoff", species: "beam-off", side: "evaluation", config: "r8", site: "sbndbuild03",
+    { id: "r8-beamoff", species: "beam-off", side: "evaluation", config: "r8", site: "sbndbuild03", history: true,
       title: "Beam-off (r7's 10k events)", date: "2026-10-16", issues: ["aih#42"],
       input: "InTime-Run1 reco1, r7's 10,000 events recovered from SAM (212 pairs, sibling CAF)", events: 10071, events_wc: 10048, units: "212 OK",
       output: "/exp/sbnd/data/users/yuhw/production-prep/r8-r26-truth-caf/{validation,semiprod}/beam-off/", size: "",
