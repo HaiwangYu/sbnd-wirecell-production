@@ -39,8 +39,8 @@ window.CATALOG = {
       workflow: "sbnd-wirecell-production branch wclocal-nov16 (d05cf47 Aurora side)",
       schema: "recTreeWireCell: af9c87c8 (as aurora-r2); recTreeWireCell_dv2snap: d4396a34 (production schema, no space)",
       keep: "semiprod (merged CAF with 2 trees + per-event tracking-pr.root per pass, no Bee)",
-      knobs: "dv2_bundle dv2max/sbnd/aurora_space (wire-cell-data #8, bundle.json 51588842…); dl_vtx_dump, flat_tree, truth_match on MC; GODEBUG=asyncpreemptoff=1; 8-node capacity jobs",
-      issues: ["aih#48", "aih#47"]
+      knobs: "dv2_bundle dv2max/sbnd/aurora_space (wire-cell-data #8, bundle.json 51588842…); dl_vtx_dump, flat_tree, truth_match on MC; GODEBUG=asyncpreemptoff=1; 8-node capacity jobs, WC_TASKS_PER_UNIT=75 on the resumes. Done 2026-11-18: 90,744 units, 922,755 events with Wire-Cell output (split-move), 2.31 TB, 210.9 node-h",
+      issues: ["aih#48", "aih#47", "aih#49"]
     },
     "WCLocal2026Nov16-FermiGrid": {
       side: "evaluation",
@@ -173,26 +173,34 @@ window.CATALOG = {
   // history: true → listed under History. Set it only when the owner says so (2026-11-17); r8-beamoff carries it because the
   //   former "two latest per species" rule had already moved it there.
   productions: [
-    // ---------------- WCLocal2026Nov16 (aih#48): running ----------------
+    // ---------------- WCLocal2026Nov16 (aih#48): done 2026-11-18 ----------------
     { id: "wcl1116-aurora-bnb", species: "mc-bnb", side: "training", config: "WCLocal2026Nov16-Aurora", site: "Aurora",
-      title: "BNB CV 1M, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17 (submitted)", issues: ["aih#48"],
+      title: "BNB CV 1M, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17", issues: ["aih#48"],
       input: "Avinay's gen2-wct0319 BNB CV; same 11,888 units as aurora-r1/r2 (step 1 reused)",
       events: 627205, events_wc: 627170, units: "11,888: 11,874 OK, 14 PARTIAL (13 aurora-r1 step-1 skips + eb42, the deterministic step-2 segfault also seen in aurora-r2)",
       output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/full/bnb/node<k>/<unit>/merged/ (both trees); per-pass tracking-pr in pr/ and pr-dv2snap/",
-      size: "", status: "running", status_note: "BNB done 2026-11-17 (job 9097095, 35.1 node-h): both validations PASS 11,888/11,888; 627,170 good events in each pass. running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).",
+      list: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/lists/bnb-merged-cafs.txt",
+      size: "merged CAFs 475.9 GB; per-event tracking-pr 359.2 GB (pr/) + 346.5 GB (pr-dv2snap/)", status: "available",
+      status_note: "checked on Flare 2026-11-18: 11,888 merged CAFs listed. Job 9097095 (8 nodes, 35.1 node-h). Both validations PASS 11,888/11,888. events_wc = recTreeWireCell (split-move); recTreeWireCell_dv2snap also has 627,170. Flipped 2026-11-18 (UTC) together with WCLocal2026Nov16-FermiGrid (owner).",
       note: "Same events as aurora-r1/r2 BNB. recTreeWireCell = dv2_split_move (with T_dlvtx_space), recTreeWireCell_dv2snap = dv2_snap." },
     { id: "wcl1116-aurora-nuecc", species: "mc-nuecc", side: "training", config: "WCLocal2026Nov16-Aurora", site: "Aurora",
-      title: "nueCC 269k, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17 (submitted)", issues: ["aih#48"],
+      title: "nueCC 269k, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-18", issues: ["aih#48"],
       input: "Avinay's gen2-sbnd-ccnue-configL-300k; same 61,252 non-empty units as aurora-r2 (step 1 reused)",
-      events: 268865, events_wc: null, units: "61,252 (running)",
+      events: 268865, events_wc: 268840, units: "61,252: 61,238 OK, 11 PARTIAL, 3 FAIL",
       output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/full/nuecc/node<k>/<unit>/merged/",
-      size: "", status: "running", status_note: "job 9097132 + resume 9097990 (WC_TASKS_PER_UNIT=75). running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).", note: "" },
+      list: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/lists/nuecc-merged-cafs.txt",
+      size: "merged CAFs 440.6 GB; per-event tracking-pr 299.4 GB (pr/) + 276.4 GB (pr-dv2snap/)", status: "available",
+      status_note: "checked on Flare 2026-11-18: 61,249 merged CAFs listed. Jobs 9097132 + resume 9097990 (8 nodes, 136.0 node-h). Both validations PASS 61,249/61,249. events_wc = recTreeWireCell (split-move); recTreeWireCell_dv2snap has 268,832. Flipped 2026-11-18 (UTC) together with WCLocal2026Nov16-FermiGrid (owner).",
+      note: "Same events as aurora-r2 nueCC. Non-OK: 7 aurora-r1 step-1 skips, 3 PARTIAL + 2 FAIL with the same step-2 crashes as aurora-r2, and 2 units that crash in the dv2_snap pass only (3619: 6 events, 56a9: 2 events; split-move complete), aih#49." },
     { id: "wcl1116-aurora-ncdr", species: "mc-ncdr", side: "training", config: "WCLocal2026Nov16-Aurora", site: "Aurora",
-      title: "NC Δ-rad (train), WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17 (submitted)", issues: ["aih#48"],
+      title: "NC Δ-rad (train), WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17", issues: ["aih#48"],
       input: "Avinay's NC Δ-rad train sample; same 17,604 non-empty units as aurora-r2 (step 1 reused)",
       events: 26745, events_wc: 26745, units: "17,604: 17,604 OK",
       output: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/full/ncdr/node<k>/<unit>/merged/",
-      size: "", status: "running", status_note: "NC done 2026-11-17 (39.8 node-h): both validations PASS, 26,745/26,745 events in each pass. running: shown as running until both WCLocal2026Nov16 productions (Aurora and FermiGrid) finish (owner, 2026-11-17).", note: "" },
+      list: "/lus/flare/projects/neutrinoGPU/yuhw/production-prep/WCLocal2026Nov16/lists/ncdr-merged-cafs.txt",
+      size: "merged CAFs 66.7 GB; per-event tracking-pr 23.1 GB (pr/) + 22.3 GB (pr-dv2snap/)", status: "available",
+      status_note: "checked on Flare 2026-11-18: 17,604 merged CAFs listed. Jobs 9097098 + resume 9097992 (8 nodes, 39.8 node-h). Both validations PASS 17,604/17,604. Every event has Wire-Cell output in both trees. Flipped 2026-11-18 (UTC) together with WCLocal2026Nov16-FermiGrid (owner).",
+      note: "Same events as aurora-r2 NC Δ-rad; the unit that FAILed in aurora-r2 (e911) is OK here." },
     { id: "wcl1116-fg-beamoff-train", species: "beam-off", side: "training", config: "WCLocal2026Nov16-FermiGrid", site: "FermiGrid",
       title: "Beam-off (InTime) training subset: odd runs, WCT 0.38.0 + aurora_space (split-move + snap)", date: "2026-11-17", issues: ["aih#48"],
       input: "wcl1116-fg-beamoff, files of odd run numbers: 80 runs, 18253–18591 (the same 572 files as fg1-beamoff-train)",
